@@ -9,6 +9,10 @@ export function cleanImportedText(value: string) {
     .trim();
 }
 
+export function capitalizeFirstLetter(value: string) {
+  return value.replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase("pt-PT"));
+}
+
 export function sanitizeImportedRecipe(draft: TextImportDraft): TextImportDraft {
   return {
     ...draft,
@@ -17,12 +21,12 @@ export function sanitizeImportedRecipe(draft: TextImportDraft): TextImportDraft 
     tags: draft.tags.map(cleanImportedText).filter(Boolean),
     ingredients: draft.ingredients.map((ingredient) => ({
       ...ingredient,
-      name: cleanImportedText(ingredient.name),
-      group: cleanImportedText(ingredient.group),
+      name: capitalizeFirstLetter(cleanImportedText(ingredient.name)),
+      group: capitalizeFirstLetter(cleanImportedText(ingredient.group)),
     })),
     steps: draft.steps.map((step) => ({
-      instruction: cleanImportedText(step.instruction),
-      section: cleanImportedText(step.section),
+      instruction: capitalizeFirstLetter(cleanImportedText(step.instruction)),
+      section: capitalizeFirstLetter(cleanImportedText(step.section)),
     })),
   };
 }

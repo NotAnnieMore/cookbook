@@ -439,25 +439,29 @@ async function uploadCover({
     return false;
   }
 
-  const { error: imageError } = await supabase.from("recipe_images").insert({
-    recipe_id: recipeId,
-    uploaded_by: userId,
-    storage_path: storagePath,
-    image_kind: "cover",
-    alt_text: `Fotografia de ${title}`,
-    width: optimized.info.width,
-    height: optimized.info.height,
-    size_bytes: optimized.data.length,
-    sort_order: 0,
-  });
+  const { data: image, error: imageError } = await supabase
+    .from("recipe_images")
+    .insert({
+      recipe_id: recipeId,
+      uploaded_by: userId,
+      storage_path: storagePath,
+      image_kind: "cover",
+      alt_text: `Fotografia de ${title}`,
+      width: optimized.info.width,
+      height: optimized.info.height,
+      size_bytes: optimized.data.length,
+      sort_order: 0,
+    })
+    .select("id")
+    .single();
 
-  if (imageError) {
-    console.error("Falha ao registar fotografia", { code: imageError.code });
+  if (imageError || !image) {
+    console.error("Falha ao registar fotografia", { code: imageError?.code });
     await supabase.storage.from("recipe-images").remove([storagePath]);
     return false;
   }
 
-  return true;
+  return { id: image.id, storagePath };
 }
 
 export async function createRecipe(
@@ -654,17 +658,17 @@ export async function createRecipe(
     }
   }
 
-  if (
-    cover &&
-    !(await uploadCover({
+  const uploadedCover = cover
+    ? await uploadCover({
       supabase,
       file: cover,
       householdId: membership.household_id,
       recipeId: recipe.id,
       userId: user.id,
       title: result.data.title,
-    }))
-  ) {
+    })
+    : null;
+  if (cover && !uploadedCover) {
     await supabase.from("recipes").delete().eq("id", recipe.id);
     if (importJob) {
       await supabase
@@ -753,10 +757,10 @@ export async function updateRecipe(
       supabase.from("recipe_tags").select("tag_id").eq("recipe_id", recipeId),
       supabase
         .from("recipe_images")
-        .select("id")
+        .select("id,storage_path")
         .eq("recipe_id", recipeId)
         .eq("image_kind", "cover")
-        .limit(1),
+        .order("created_at", { ascending: true }),
     ]);
 
   if (!recipeResult.data || recipeResult.error) {
@@ -780,13 +784,6 @@ export async function updateRecipe(
         "A receita foi alterada noutro dispositivo. Volta à receita e abre novamente a edição.",
     };
   }
-  if (cover && (coverResult.data?.length ?? 0) > 0) {
-    return {
-      message:
-        "Esta receita já tem fotografia principal. A substituição será adicionada com a galeria.",
-    };
-  }
-
   const [structure, tags] = await Promise.all([
     createRecipeStructure(
       supabase,
@@ -951,14 +948,40 @@ export async function updateRecipe(
 
   let photoFailed = false;
   if (cover) {
-    photoFailed = !(await uploadCover({
+    const newCover = await uploadCover({
       supabase,
       file: cover,
       householdId: recipeResult.data.household_id,
       recipeId,
       userId: user.id,
       title: result.data.title,
-    }));
+    });
+    photoFailed = !newCover;
+
+    const oldCovers = coverResult.data ?? [];
+    if (newCover && oldCovers.length) {
+      const oldCoverIds = oldCovers.map((image) => image.id);
+      const { data: removedCovers, error: removeRowsError } = await supabase
+        .from("recipe_images")
+        .delete()
+        .in("id", oldCoverIds)
+        .select("id");
+
+      if (removeRowsError || (removedCovers?.length ?? 0) !== oldCoverIds.length) {
+        photoFailed = true;
+        await Promise.all([
+          supabase.from("recipe_images").delete().eq("id", newCover.id),
+          supabase.storage.from("recipe-images").remove([newCover.storagePath]),
+        ]);
+      } else {
+        const { error: removeFilesError } = await supabase.storage
+          .from("recipe-images")
+          .remove(oldCovers.map((image) => image.storage_path));
+        if (removeFilesError) {
+          console.error("A fotografia anterior deixou um ficheiro órfão", { code: removeFilesError.name });
+        }
+      }
+    }
   }
 
   revalidatePath("/");

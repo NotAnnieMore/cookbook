@@ -36,3 +36,21 @@ test("sanitizes the editable fields while retaining the original ingredient text
   assert.equal(draft.ingredients[0].originalText, "200g  Bolacha Maria 🍪");
   assert.deepEqual(draft.steps[0], { instruction: "Triturar tudo.", section: "Preparar a base" });
 });
+
+test("capitalizes the first actual letter in imported ingredients and preparation", () => {
+  const draft = sanitizeImportedRecipe({
+    title: "Receita",
+    description: "",
+    servings: "",
+    activeTime: "",
+    totalTime: "",
+    difficulty: "",
+    tags: [],
+    ingredients: [{ name: "(bem maduro) abacate", quantity: "1", quantityMax: "", unit: "unid.", optional: false, group: "molho", packageQuantity: "", packageUnit: "" }],
+    steps: [{ instruction: "aquecer o forno.", section: "preparação" }],
+  });
+
+  assert.equal(draft.ingredients[0].name, "(Bem maduro) abacate");
+  assert.equal(draft.ingredients[0].group, "Molho");
+  assert.deepEqual(draft.steps[0], { instruction: "Aquecer o forno.", section: "Preparação" });
+});

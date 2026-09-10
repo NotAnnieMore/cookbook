@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 
+import { sanitizeImportedRecipe } from "@/lib/recipes/import-sanitizer";
 import {
   parseRecipeText,
   type TextImportDraft,
@@ -89,11 +90,13 @@ export async function analyseRecipeText(
     return { message: result.error ?? "Não foi possível interpretar o texto." };
   }
 
+  const sanitizedDraft = sanitizeImportedRecipe(result.draft);
+
   const { error: previewError } = await supabase
     .from("import_jobs")
     .update({
       status: "preview",
-      result_draft: result.draft,
+      result_draft: sanitizedDraft,
       error_code: null,
       error_message: null,
     })
@@ -103,7 +106,7 @@ export async function analyseRecipeText(
   }
 
   return {
-    draft: result.draft,
+    draft: sanitizedDraft,
     warnings: result.warnings,
     importJobId: job.id,
   };

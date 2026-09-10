@@ -12,4 +12,9 @@ Depois de criar o projeto remoto:
 6. confirmar que a consulta final devolve os membros Ana e Ivo;
 7. antes de produção, configurar a Supabase CLI e transformar os schemas em migrations versionadas.
 
+Num projeto que já tenha recebido os dois schemas antes da funcionalidade de
+substituição de fotografias, executar também
+`setup/02_shared_image_replacement.sql`. Este ajuste permite que Ivo ou Ana
+substituam uma fotografia da coleção, mesmo quando foi o outro membro a enviá-la.
+
 Nunca colocar a secret key/service-role no browser nem em variáveis `NEXT_PUBLIC_*`.

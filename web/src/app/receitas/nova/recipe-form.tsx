@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import ImageCropper from "@/components/image-cropper";
-import { combineDurationParts, splitDurationMinutes } from "@/lib/recipes/duration";
+import { durationInputToMinutes, formatDurationInput } from "@/lib/recipes/duration";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
 import { createRecipe, type CreateRecipeState } from "./actions";
@@ -125,9 +125,7 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
   const localPreview = useRef<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [cropSource, setCropSource] = useState<{ url: string; fileName: string } | null>(null);
-  const initialTotalTime = splitDurationMinutes(initialValues?.totalTime);
-  const [totalHours, setTotalHours] = useState(initialTotalTime.hours);
-  const [totalMinutes, setTotalMinutes] = useState(initialTotalTime.minutes);
+  const [totalTimeInput, setTotalTimeInput] = useState(() => formatDurationInput(initialValues?.totalTime));
   const submitting = useRef(false);
   const hasExistingCover = Boolean(initialValues?.coverUrl);
 
@@ -224,7 +222,8 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
   const serializedIngredients = ingredientParts.flatMap((part) => part.ingredients.map(({ name, quantity, quantityMax, unit, optional, packageQuantity, packageUnit, originalQuantity, originalQuantityMax, originalUnit, originalText, conversionConfidence, conversionSource, conversionRuleVersion }) => ({ name, quantity, quantityMax, unit, optional, group: part.title, packageQuantity, packageUnit, originalQuantity, originalQuantityMax, originalUnit, originalText, conversionConfidence, conversionSource, conversionRuleVersion })));
   const serializedSteps = preparationPhases.flatMap((phase) => phase.steps.map(({ instruction }) => ({ instruction, section: phase.title })));
   const serializedTags = cleanTags([...tags, ...tagDraft.split(",")]);
-  const totalTimeValue = combineDurationParts(totalHours, totalMinutes);
+  const totalTimeValue = durationInputToMinutes(totalTimeInput);
+  const totalTimeInvalid = totalTimeValue === "invalid";
 
   return (
     <form action={formAction} onSubmit={() => { submitting.current = true; }} className="mx-auto max-w-5xl px-5 pb-24 sm:px-8">
@@ -242,7 +241,7 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
           <div className="space-y-5">
             <label className="block"><span className="mb-2 block text-sm font-extrabold">Nome da receita</span><input className={inputClass} name="title" required minLength={2} maxLength={200} placeholder="Ex.: Cheesecake da Ana" autoFocus={mode === "create"} defaultValue={initialValues?.title} /></label>
             <label className="block"><span className="mb-2 block text-sm font-extrabold">Pequena descrição <span className="font-normal text-[#8A8278]">(opcional)</span></span><textarea className={`${inputClass} min-h-32 resize-y py-3`} name="description" maxLength={1200} placeholder="O que torna esta receita especial?" defaultValue={initialValues?.description} /></label>
-            <div><span className="mb-2 block text-sm font-extrabold">Fotografia principal <span className="font-normal text-[#8A8278]">(opcional)</span></span>{coverPreview ? <div role="img" aria-label="Pré-visualização da fotografia principal" className="mb-3 aspect-3/2 rounded-[2rem_2rem_4rem_2rem] bg-cover bg-center" style={{ backgroundImage: `url("${coverPreview.replaceAll('"', '\\"')}")` }} /> : <div className="mb-3 grid h-36 place-items-center rounded-[2rem_2rem_4rem_2rem] border-2 border-dashed border-[#D8D0C4] bg-[#F8F4EC] text-center text-sm font-bold text-[#766F67]">Uma fotografia torna a coleção mais vossa.</div>}{hasExistingCover ? <p className="text-xs leading-5 text-[#766F67]">Esta receita já tem fotografia. A substituição chegará com a galeria.</p> : <label className="inline-flex min-h-12 cursor-pointer items-center rounded-full border-2 border-[#285240] px-5 text-sm font-extrabold text-[#285240] hover:bg-[#E5EBDD]">Escolher fotografia<input ref={coverInputRef} type="file" name="cover_image" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => chooseCover(event.target.files?.[0])} /></label>}<p className="mt-2 text-xs text-[#8A8278]">JPG, PNG, WebP ou AVIF · máximo 10 MB · podes recortar antes de guardar</p></div>
+            <div><span className="mb-2 block text-sm font-extrabold">Fotografia principal <span className="font-normal text-[#8A8278]">(opcional)</span></span>{coverPreview ? <div role="img" aria-label="Pré-visualização da fotografia principal" className="mb-3 aspect-3/2 rounded-[2rem_2rem_4rem_2rem] bg-cover bg-center" style={{ backgroundImage: `url("${coverPreview.replaceAll('"', '\\"')}")` }} /> : <div className="mb-3 grid h-36 place-items-center rounded-[2rem_2rem_4rem_2rem] border-2 border-dashed border-[#D8D0C4] bg-[#F8F4EC] text-center text-sm font-bold text-[#766F67]">Uma fotografia torna a coleção mais vossa.</div>}<label className="inline-flex min-h-12 cursor-pointer items-center rounded-full border-2 border-[#285240] px-5 text-sm font-extrabold text-[#285240] hover:bg-[#E5EBDD]">{hasExistingCover ? "Substituir fotografia" : "Escolher fotografia"}<input ref={coverInputRef} type="file" name="cover_image" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => chooseCover(event.target.files?.[0])} /></label>{hasExistingCover ? <p className="mt-2 text-xs leading-5 text-[#766F67]">A fotografia atual só é apagada depois de a nova ficar guardada com sucesso.</p> : null}<p className="mt-2 text-xs text-[#8A8278]">JPG, PNG, WebP ou AVIF · máximo 10 MB · podes recortar antes de guardar</p></div>
           </div>
         </section>
 
@@ -252,7 +251,7 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
             <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-extrabold">Doses</span><div className="relative"><input className={`${inputClass} pr-20`} name="servings" inputMode="decimal" placeholder="4" defaultValue={initialValues?.servings} /><span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-[#766F67]">pessoas</span></div></label>
             <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-extrabold">Dificuldade</span><select className={inputClass} name="difficulty" defaultValue={initialValues?.difficulty ?? "easy"}><option value="">Por definir</option><option value="easy">Fácil</option><option value="medium">Média</option><option value="hard">Exigente</option></select></label>
             <label><span className="mb-2 block text-sm font-extrabold">Tempo ativo</span><div className="relative"><input className={`${inputClass} pr-12`} name="active_time" type="number" min="0" step="1" placeholder="20" defaultValue={initialValues?.activeTime} /><span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-[#766F67]">min</span></div><span className="mt-1.5 block text-xs leading-5 text-[#667064]">Tempo passado realmente a preparar.</span></label>
-            <fieldset><legend className="mb-2 block text-sm font-extrabold">Tempo total</legend><div className="grid grid-cols-2 gap-2"><label><span className="sr-only">Horas do tempo total</span><div className="relative"><input className={`${inputClass} pr-9`} type="number" min="0" step="1" placeholder="1" value={totalHours} onChange={(event) => setTotalHours(event.target.value)} /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[#766F67]">h</span></div></label><label><span className="sr-only">Minutos do tempo total</span><div className="relative"><input className={`${inputClass} pr-12`} type="number" min="0" max="59" step="1" placeholder="30" value={totalMinutes} onChange={(event) => setTotalMinutes(event.target.value)} /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[#766F67]">min</span></div></label></div><p className="mt-1.5 text-xs leading-5 text-[#667064]">Até ficar pronto a servir, incluindo esperas.</p></fieldset>
+            <label><span className="mb-2 block text-sm font-extrabold">Tempo total</span><input className={inputClass} type="text" inputMode="text" placeholder="Ex.: 4h 30min" value={totalTimeInput} onChange={(event) => setTotalTimeInput(event.target.value)} aria-invalid={totalTimeInvalid} aria-describedby="total-time-help" /><span id="total-time-help" className={`mt-1.5 block text-xs leading-5 ${totalTimeInvalid ? "font-bold text-[#9A402F]" : "text-[#667064]"}`}>{totalTimeInvalid ? "Usa, por exemplo, 6h, 4h 30min ou 45min." : "Até ficar pronto a servir. Podes escrever 6h, 4h 30min ou 45min."}</span></label>
           </div>
           <div className="mt-6 border-t border-[#C8D2C0] pt-5">
             <label htmlFor="recipe-tag" className="block text-sm font-extrabold">Etiquetas <span className="font-normal text-[#6F786D]">(opcional)</span></label>
@@ -325,7 +324,7 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
       </section>
 
       {state.message ? <p role="alert" className="mt-7 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">{state.message}</p> : null}
-      <div className="mt-8 flex flex-col-reverse items-stretch justify-between gap-4 sm:flex-row sm:items-center"><p className="text-center text-sm text-[#766F67] sm:text-left">{mode === "edit" ? "Alterações guardadas por" : "Será guardada por"} <strong className="text-[#27231F]">{displayName}</strong>.</p><button type="submit" disabled={pending || externalChange} className="min-h-14 rounded-full bg-[#F36F56] px-8 text-base font-extrabold text-white shadow-[0_6px_0_#D94F38] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60">{pending ? "A guardar…" : externalChange ? "Atualiza antes de guardar" : mode === "edit" ? "Guardar alterações" : "Guardar receita"}</button></div>
+      <div className="mt-8 flex flex-col-reverse items-stretch justify-between gap-4 sm:flex-row sm:items-center"><p className="text-center text-sm text-[#766F67] sm:text-left">{mode === "edit" ? "Alterações guardadas por" : "Será guardada por"} <strong className="text-[#27231F]">{displayName}</strong>.</p><button type="submit" disabled={pending || externalChange || totalTimeInvalid} className="min-h-14 rounded-full bg-[#F36F56] px-8 text-base font-extrabold text-white shadow-[0_6px_0_#D94F38] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60">{pending ? "A guardar…" : externalChange ? "Atualiza antes de guardar" : totalTimeInvalid ? "Confirma o tempo total" : mode === "edit" ? "Guardar alterações" : "Guardar receita"}</button></div>
       {cropSource ? <ImageCropper sourceUrl={cropSource.url} fileName={cropSource.fileName} onCancel={() => closeCropper()} onApply={applyCroppedCover} /> : null}
     </form>
   );

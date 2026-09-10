@@ -360,7 +360,7 @@ create policy "imports_delete_self" on public.import_jobs for delete to authenti
 create policy "images_select_member" on public.recipe_images for select to authenticated using (public.can_access_recipe(recipe_id));
 create policy "images_insert_self" on public.recipe_images for insert to authenticated with check (uploaded_by = auth.uid() and public.can_access_recipe(recipe_id));
 create policy "images_update_self" on public.recipe_images for update to authenticated using (uploaded_by = auth.uid() and public.can_access_recipe(recipe_id)) with check (uploaded_by = auth.uid() and public.can_access_recipe(recipe_id));
-create policy "images_delete_self" on public.recipe_images for delete to authenticated using (uploaded_by = auth.uid() and public.can_access_recipe(recipe_id));
+create policy "images_delete_household_member" on public.recipe_images for delete to authenticated using (public.can_access_recipe(recipe_id));
 
 grant select, insert, update, delete on public.profiles to authenticated;
 grant select, update on public.households to authenticated;

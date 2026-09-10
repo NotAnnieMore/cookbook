@@ -61,6 +61,5 @@ create policy "recipe_images_storage_delete"
 on storage.objects for delete to authenticated
 using (
   bucket_id = 'recipe-images'
-  and owner_id = auth.uid()::text
   and public.is_household_member(public.storage_household_id(name))
 );

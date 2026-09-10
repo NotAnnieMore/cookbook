@@ -8,10 +8,10 @@ linguagem visual quente, editorial e assumidamente culinária.
 
 - autenticação privada para contas criadas manualmente;
 - coleção de receitas partilhada entre os membros da casa;
-- criação manual com doses, tempo ativo, tempo total em horas/minutos, dificuldade, ingredientes e passos;
+- criação manual com doses, tempo ativo e tempo total escrito naturalmente (`6h`, `4h 30min` ou `45min`), dificuldade, ingredientes e passos;
 - edição protegida contra conflitos entre dispositivos;
-- fotografia principal privada, com enquadramento 3:2 escolhido pelo utilizador,
-  validação e otimização automática para WebP;
+- fotografia principal privada, substituível, com enquadramento 3:2 escolhido pelo
+  utilizador, validação e otimização automática para WebP;
 - caixote temporário com restauro de receitas;
 - grupos de ingredientes e secções de preparação;
 - ajuste temporário das quantidades ao número de pessoas;
@@ -20,7 +20,8 @@ linguagem visual quente, editorial e assumidamente culinária.
 - importação de texto com preservação da fonte e preview editável obrigatório;
 - importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
 - adaptador TikTok via oEmbed, com separação automática de listas inline e grupos,
-  remoção de emojis e limpeza de espaços repetidos;
+  remoção de emojis, limpeza de espaços repetidos e capitalização de ingredientes
+  e preparação;
 - etiquetas e filtros combináveis;
 - painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;
@@ -88,7 +89,7 @@ npm run build
 
 ## Próximas fases
 
-- substituição da fotografia principal e galeria;
+- galeria de fotografias por receita;
 - adaptador dedicado para Instagram e extração multimodal de vídeos;
 - extração estruturada com IA apenas como fallback;
 - modo cozinha com gestos, progresso e temporizadores;
