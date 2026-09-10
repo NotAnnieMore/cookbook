@@ -18,6 +18,7 @@ linguagem visual quente, editorial e assumidamente culinária.
 - medidas europeias por defeito, conversões americanas e referências por ingrediente;
 - importação de texto com preservação da fonte e preview editável obrigatório;
 - importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
+- adaptador TikTok via oEmbed e passagem assistida para texto quando a legenda pública é insuficiente;
 - etiquetas e filtros combináveis;
 - painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;
@@ -86,7 +87,7 @@ npm run build
 ## Próximas fases
 
 - substituição da fotografia principal e galeria;
-- adaptadores dedicados para TikTok e Instagram;
+- adaptador dedicado para Instagram e extração multimodal de vídeos;
 - extração estruturada com IA apenas como fallback;
 - modo cozinha com gestos, progresso e temporizadores;
 - backups exportáveis e recuperação testada.

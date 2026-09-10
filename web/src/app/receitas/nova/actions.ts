@@ -615,7 +615,7 @@ export async function createRecipe(
           source_url: importJob.input_type === "url" ? importJob.source_url : null,
           source_title_original:
             draftTitle(importJob.result_draft) ?? result.data.title,
-          source_text_original: importJob.input_type === "text" ? importJob.input_text : null,
+          source_text_original: importJob.input_text,
           imported_by: user.id,
         })
       : Promise.resolve({ error: null }),

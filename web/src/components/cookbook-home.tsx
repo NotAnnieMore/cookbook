@@ -305,9 +305,9 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
           <NavItem icon="compass" label="Descobrir" href="#descobrir" />
           <NavButton icon="more" label="Mais" onClick={() => setProfileOpen(true)} />
         </nav>
-        <Link href="/receitas/nova" className="mt-7 flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5">
-          <Icon name="plus" size={20} /><span className="hidden lg:inline">Nova receita</span>
-        </Link>
+        <button type="button" onClick={() => setAddOpen(true)} className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5" aria-label="Adicionar ou importar receita">
+          <Icon name="plus" size={20} /><span className="hidden lg:inline">Adicionar receita</span>
+        </button>
         <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} className="mt-auto flex min-h-16 w-full items-center gap-3 border-t border-[#E5DED4] px-2 pt-5 text-left transition hover:text-[#285240]">
           <span className="grid size-10 shrink-0 place-items-center rounded-[55%_45%_62%_38%/45%_55%_45%_55%] bg-[#F36F56] font-serif text-lg font-black text-white">{profileInitial}</span>
           <div className="hidden min-w-0 lg:block"><p className="truncate text-sm font-extrabold">{displayName}</p><p className="text-xs text-[#7B746B]">Perfil ativo</p></div>

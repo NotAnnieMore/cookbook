@@ -51,7 +51,7 @@ async function requestPage(url: URL, redirectCount: number): Promise<{ html: str
         family: address.family,
         lookup: (_hostname, _options, callback) => callback(null, address.address, address.family),
         headers: {
-          Accept: "text/html,application/xhtml+xml,text/plain;q=0.8",
+          Accept: "text/html,application/xhtml+xml,application/json,text/plain;q=0.8",
           "Accept-Encoding": "identity",
           "User-Agent": "CookbookRecipeImporter/1.0 (+private recipe collection)",
         },
@@ -78,7 +78,7 @@ async function requestPage(url: URL, redirectCount: number): Promise<{ html: str
         }
 
         const contentType = String(response.headers["content-type"] ?? "").toLocaleLowerCase("en-US");
-        if (contentType && !contentType.includes("text/html") && !contentType.includes("application/xhtml+xml") && !contentType.includes("text/plain")) {
+        if (contentType && !contentType.includes("text/html") && !contentType.includes("application/xhtml+xml") && !contentType.includes("application/json") && !contentType.includes("text/plain")) {
           response.resume();
           reject(new SafeUrlError("UNSUPPORTED_CONTENT", "O endereço não aponta para uma página de texto ou HTML."));
           return;
