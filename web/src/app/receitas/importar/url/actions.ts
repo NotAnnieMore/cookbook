@@ -3,10 +3,11 @@
 import { z } from "zod";
 
 import { canonicalInstagramPostUrl, extractRecipeFromInstagramHtml, prepareInstagramCaption } from "@/lib/recipes/instagram-import";
+import { extractRecipeWithGemini, type GeminiImportOutcome } from "@/lib/recipes/gemini-import";
 import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, prepareTikTokCaption } from "@/lib/recipes/tiktok-import";
 import { cleanImportedText, sanitizeImportedRecipe } from "@/lib/recipes/import-sanitizer";
 import { parseRecipeText } from "@/lib/recipes/text-import";
-import { extractRecipeFromHtml, type UrlImportResult } from "@/lib/recipes/url-import";
+import { extractReadableRecipeText, extractRecipeFromHtml, type UrlImportResult } from "@/lib/recipes/url-import";
 import { fetchPublicRecipePage, parsePublicHttpUrl, SafeUrlError } from "@/lib/safe-url-fetch";
 import { createClient } from "@/lib/supabase/server";
 
@@ -96,6 +97,7 @@ export async function analyseRecipeUrl(
   let result: UrlImportResult | null = null;
   let usedTikTokAdapter = false;
   let usedInstagramAdapter = false;
+  let usedGeminiFallback = false;
   let publicSocialCaption: string | null = null;
   let fetchedPage: Awaited<ReturnType<typeof fetchPublicRecipePage>> | null = null;
 
@@ -179,11 +181,30 @@ export async function analyseRecipeUrl(
       }).eq("id", job.id);
       return { message: `${safeError.message} Podes sempre copiar o texto da receita e usar “Importar texto”.` };
     }
+    fetchedPage = page;
     sourceUrl = socialUrl ?? page.finalUrl;
     result = extractRecipeFromHtml(page.html);
   }
 
   await supabase.from("import_jobs").update({ status: "parsing", source_url: sourceUrl }).eq("id", job.id);
+  let geminiOutcome: GeminiImportOutcome | null = null;
+  if (!result.draft || result.error) {
+    const aiSourceText = sourceText?.success
+      ? sourceText.data
+      : publicSocialCaption
+        ?? (fetchedPage ? extractReadableRecipeText(fetchedPage.html) : "");
+    const fallbackTitle = result.sourceTitle ?? "";
+    geminiOutcome = await extractRecipeWithGemini(aiSourceText, fallbackTitle);
+    if (geminiOutcome.result?.draft && !geminiOutcome.result.error) {
+      result = geminiOutcome.result;
+      usedGeminiFallback = true;
+    } else if (geminiOutcome.errorCode && geminiOutcome.errorCode !== "NO_SOURCE_TEXT") {
+      console.error("A extração assistida pelo Gemini não ficou disponível", {
+        code: geminiOutcome.errorCode,
+      });
+    }
+  }
+
   if (!result.draft || result.error) {
     const message = tikTokUrl
       ? "O TikTok só disponibilizou uma legenda curta, sem ingredientes e preparação suficientes."
@@ -196,21 +217,26 @@ export async function analyseRecipeUrl(
       error_message: result.error ?? message,
       completed_at: new Date().toISOString(),
     }).eq("id", job.id);
+    const aiSuffix = geminiOutcome && geminiOutcome.errorCode !== "NO_SOURCE_TEXT"
+      ? " A leitura assistida por IA também não conseguiu organizar o conteúdo disponível."
+      : "";
     return socialUrl
       ? {
-          message: `${message} Cola abaixo o texto completo que vês na publicação e mantemos este link como origem.`,
+          message: `${message}${aiSuffix} Cola abaixo o texto completo que vês na publicação e mantemos este link como origem.`,
           sourceUrl: socialUrl,
           needsSourceText: true,
           publicCaption: publicSocialCaption,
           sourceKind,
         }
-      : { message: `${message} Experimenta “Importar texto” para teres controlo total.` };
+      : { message: `${message}${aiSuffix} Experimenta “Importar texto” para teres controlo total.` };
   }
 
   const sanitizedDraft = sanitizeImportedRecipe(result.draft);
 
   const warnings = [...result.warnings];
-  if (sourceText?.success && socialUrl) {
+  if (usedGeminiFallback) {
+    warnings.unshift("Esta página precisou de organização assistida por IA. Confirma os ingredientes, quantidades e passos antes de guardar.");
+  } else if (sourceText?.success && socialUrl) {
     warnings.unshift(`Receita extraída do texto que colaste; o link do ${instagramUrl ? "Instagram" : "TikTok"} ficou guardado como fonte original.`);
   } else if (usedTikTokAdapter) {
     warnings.unshift("Descrição pública obtida diretamente do TikTok; confirma as quantidades, pois muitos vídeos não as indicam.");

@@ -49,7 +49,7 @@ export default function UrlImportFlow({ displayName }: { displayName: string }) 
         <input id="source-url" name="source_url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" required maxLength={2048} defaultValue={state.sourceUrl} className="mt-5 min-h-14 w-full rounded-2xl border-2 border-[#D8D0C4] bg-[#F8F4EC] px-5 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#999187] focus:border-[#285240] focus:ring-4 focus:ring-[#285240]/10" placeholder="https://exemplo.com/receita" />
         <details className="mt-4 rounded-2xl bg-[#F8F4EC] px-4 py-3 text-sm text-[#6F6860]">
           <summary className="cursor-pointer font-extrabold text-[#285240]">O que conseguimos ler</summary>
-          <p className="mt-3 leading-6">Procuramos primeiro dados Schema.org próprios para receitas. No TikTok e Instagram, tentamos também organizar a descrição pública da publicação. Sites privados, páginas que exigem login ou bloqueiam automação podem não funcionar.</p>
+          <p className="mt-3 leading-6">Procuramos primeiro dados Schema.org próprios para receitas. No TikTok e Instagram, tentamos também organizar a descrição pública da publicação. Se estes métodos não forem suficientes, enviamos ao Gemini apenas o texto público já recolhido e limpo — nunca sessões, cookies ou a chave da app. Sites privados, páginas que exigem login ou bloqueiam automação podem não funcionar.</p>
         </details>
         {state.message ? <p role="alert" className="mt-5 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">{state.message}</p> : null}
         {state.needsSourceText ? (

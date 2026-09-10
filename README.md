@@ -19,6 +19,8 @@ linguagem visual quente, editorial e assumidamente culinária.
 - medidas europeias por defeito, conversões americanas e referências por ingrediente;
 - importação de texto com preservação da fonte e preview editável obrigatório;
 - importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
+- organização assistida pelo Gemini 3.5 Flash-Lite quando os parsers não conseguem
+  separar uma página, usando apenas texto público limpo e nunca acesso direto ao URL;
 - adaptador TikTok via oEmbed, com separação automática de listas inline e grupos,
   remoção de emojis, limpeza de espaços repetidos e capitalização de ingredientes
   e preparação;
@@ -69,6 +71,7 @@ Preencher `.env.local` sem o adicionar ao Git:
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=SUA_CHAVE_PUBLICA
+GEMINI_API_KEY=SUA_CHAVE_PRIVADA_DO_GOOGLE_AI_STUDIO
 ```
 
 No SQL Editor da Supabase, executar pela ordem indicada:
@@ -92,13 +95,12 @@ npm run build
 ## Próximas fases
 
 - galeria de fotografias por receita;
-- extração com IA e eventual leitura multimodal apenas como fallback;
-- extração estruturada com IA apenas como fallback;
+- eventual leitura multimodal de publicações apenas como fallback explícito;
 - modo cozinha com gestos, progresso e temporizadores;
 - backups exportáveis e recuperação testada.
 
 ## Deploy
 
-Na Vercel, configurar `web` como **Root Directory**. As variáveis da Supabase
-devem ser definidas diretamente nas Environment Variables do projeto e nunca
-incluídas no repositório.
+Na Vercel, configurar `web` como **Root Directory**. As variáveis da Supabase e
+`GEMINI_API_KEY` devem ser definidas diretamente nas Environment Variables do
+projeto e nunca incluídas no repositório.

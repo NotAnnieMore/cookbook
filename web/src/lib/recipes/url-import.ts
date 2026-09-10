@@ -184,6 +184,17 @@ function visiblePageText(html: string) {
     .slice(0, 30_000);
 }
 
+export function extractReadableRecipeText(html: string) {
+  const title = metaContent(html, ["og:title", "twitter:title"])
+    || cleanText(html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1], 200);
+  const description = metaContent(html, ["og:description", "twitter:description", "description"]);
+
+  return [title, description, visiblePageText(html)]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 30_000);
+}
+
 function htmlFallback(html: string): UrlImportResult {
   const title = metaContent(html, ["og:title", "twitter:title"]) || cleanText(html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1], 200);
   const description = metaContent(html, ["og:description", "twitter:description", "description"]);

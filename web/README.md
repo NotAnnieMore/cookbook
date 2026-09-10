@@ -34,6 +34,8 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 - etiquetas partilhadas e filtros por favorito, duração, dificuldade e etiqueta;
 - importação de texto com parser determinístico, rate limit e preview obrigatório;
 - importação por URL com proteção SSRF, limites de rede, Schema.org, fallback HTML e preview obrigatório;
+- fallback com Gemini 3.5 Flash-Lite para organizar apenas o texto público já
+  recolhido pelo servidor quando os parsers determinísticos não são suficientes;
 - importação TikTok por oEmbed, limpeza de links de partilha, parsing de listas inline,
   grupos e hashtags, remoção de emojis, normalização de espaços e capitalização
   dos ingredientes e passos;
@@ -56,8 +58,7 @@ O projeto Supabase está ligado e a primeira camada de autenticação está impl
 - schema com RLS, Realtime e Storage privado preparado no projeto remoto;
 - atualização em tempo real da coleção e dos favoritos entre Ivo e Ana.
 
-A próxima fase é a extração com IA quando a legenda, os dados estruturados e o
-HTML não forem suficientes. A eventual leitura multimodal de vídeos permanece
-um fallback posterior e explícito.
+A eventual leitura multimodal de vídeos permanece um fallback posterior e
+explícito.
 
 O contexto completo encontra-se em `../Cookbook_Project_Context/`.
