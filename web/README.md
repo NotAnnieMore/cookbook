@@ -32,7 +32,7 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 - etiquetas partilhadas e filtros por favorito, duração, dificuldade e etiqueta;
 - importação de texto com parser determinístico, rate limit e preview obrigatório;
 - importação por URL com proteção SSRF, limites de rede, Schema.org, fallback HTML e preview obrigatório;
-- importação TikTok por oEmbed, limpeza de links de partilha e fallback assistido para colar a descrição mantendo a fonte;
+- importação TikTok por oEmbed, limpeza de links de partilha e parsing de listas inline com emojis, grupos e hashtags;
 - cartões de destaque na coleção e no detalhe com cor complementar escolhida a partir da fotografia;
 - skeletons de navegação e de análise de imagem, sem flashes da paleta provisória;
 - leitura completa de cada receita;

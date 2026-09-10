@@ -18,7 +18,7 @@ linguagem visual quente, editorial e assumidamente culinária.
 - medidas europeias por defeito, conversões americanas e referências por ingrediente;
 - importação de texto com preservação da fonte e preview editável obrigatório;
 - importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
-- adaptador TikTok via oEmbed e passagem assistida para texto quando a legenda pública é insuficiente;
+- adaptador TikTok via oEmbed, com separação automática de listas inline, emojis e grupos;
 - etiquetas e filtros combináveis;
 - painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;

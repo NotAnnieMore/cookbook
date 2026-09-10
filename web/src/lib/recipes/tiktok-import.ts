@@ -23,12 +23,20 @@ export function canonicalTikTokVideoUrl(input: string) {
 export function prepareTikTokCaption(caption: string) {
   return caption
     .replace(/\r\n?/g, "\n")
+    .replace(/^([^\n]{4,90}?(?:✨️?|🤎|❤️|😋|🍰|🍴))\s+(?=\p{Lu})/u, "$1\n")
     .replace(/\s*\*{0,2}(ingredients?|ingredientes?)\s*:\s*\*{0,2}\s*/gi, "\nIngredients\n")
     .replace(/\s*\*{0,2}(instructions?|directions?|prepara(?:ç|c)[aã]o)\s*:\s*\*{0,2}\s*/gi, "\nInstructions\n")
+    .replace(/([^\n]) {2,}([\p{Lu}][\p{L} ]{2,40}) {2,}(?=[👉➡➜➤•])/gu, "$1\n$2:\n")
+    .replace(/\s*(?:👉|➡️?|➜|➤|•)\s*/g, "\n- ")
     .replace(/[ \t]+\*[ \t]+(?=\S)/g, "\n- ")
     .replace(/[ \t]+(?=\d+[.)][ \t]+)/g, "\n")
+    .replace(/(?:\s*#[\p{L}\p{N}_-]+)+\s*$/u, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function hashtags(caption: string) {
+  return [...new Set([...caption.matchAll(/#([\p{L}\p{N}_-]+)/gu)].map((match) => match[1]))].slice(0, 12);
 }
 
 export function extractRecipeFromTikTokOEmbed(body: string): TextImportResult & { authorName: string | null; caption: string | null } {
@@ -43,6 +51,7 @@ export function extractRecipeFromTikTokOEmbed(body: string): TextImportResult & 
   }
 
   const result = parseRecipeText(prepareTikTokCaption(payload.title));
+  if (result.draft) result.draft.tags = hashtags(payload.title);
   return {
     ...result,
     authorName: typeof payload.author_name === "string" ? payload.author_name.slice(0, 120) : null,
