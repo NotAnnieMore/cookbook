@@ -97,7 +97,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
 
   return (
     <main className="min-h-screen bg-[#F8F4EC] pb-20 text-[#27231F]">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6 sm:px-8">
+      <header className="sticky top-0 z-40 mx-auto flex max-w-6xl items-center justify-between border-b border-[#DDD5C9]/75 bg-[#F8F4EC]/92 px-5 py-3 backdrop-blur-md sm:px-8">
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
           <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6" /></svg>
           Voltar à coleção

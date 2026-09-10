@@ -35,6 +35,7 @@ const difficultyLabels = {
 
 const cardColours = ["#F2A58B", "#F3C565", "#A9C7B2", "#AFC9DA"];
 type QuickFilter = "favourites" | "quick" | "easy";
+type HomeSection = "topo" | "receitas" | "descobrir";
 
 function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -70,9 +71,9 @@ function BrandMark() {
   );
 }
 
-function NavItem({ icon, label, href, active = false }: { icon: IconName; label: string; href: string; active?: boolean }) {
+function NavItem({ icon, label, href, active = false, onClick }: { icon: IconName; label: string; href: string; active?: boolean; onClick?: () => void }) {
   return (
-    <a href={href} aria-current={active ? "page" : undefined} className={`group flex min-h-12 items-center gap-3 px-3 text-sm font-bold transition ${active ? "text-[#285240]" : "text-[#736C64] hover:text-[#27231F]"}`}>
+    <a href={href} onClick={onClick} aria-current={active ? "page" : undefined} className={`group flex min-h-12 items-center gap-3 px-3 text-sm font-bold transition ${active ? "text-[#285240]" : "text-[#736C64] hover:text-[#27231F]"}`}>
       <span className={`grid size-10 place-items-center transition ${active ? "rounded-[48%_52%_38%_62%/58%_42%_58%_42%] bg-[#E5EBDD]" : "rounded-full group-hover:bg-[#F2EDE5]"}`}>
         <Icon name={icon} size={20} />
       </span>
@@ -81,10 +82,10 @@ function NavItem({ icon, label, href, active = false }: { icon: IconName; label:
   );
 }
 
-function NavButton({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+function NavButton({ icon, label, onClick, active = false }: { icon: IconName; label: string; onClick: () => void; active?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className="group flex min-h-12 w-full items-center gap-3 px-3 text-sm font-bold text-[#736C64] transition hover:text-[#27231F]">
-      <span className="grid size-10 place-items-center rounded-full transition group-hover:bg-[#F2EDE5]">
+    <button type="button" onClick={onClick} aria-current={active ? "page" : undefined} className={`group flex min-h-12 w-full items-center gap-3 px-3 text-sm font-bold transition ${active ? "text-[#285240]" : "text-[#736C64] hover:text-[#27231F]"}`}>
+      <span className={`grid size-10 place-items-center transition ${active ? "rounded-[55%_45%_42%_58%] bg-[#E5EBDD]" : "rounded-full group-hover:bg-[#F2EDE5]"}`}>
         <Icon name={icon} size={20} />
       </span>
       <span className="hidden lg:inline">{label}</span>
@@ -125,7 +126,7 @@ function RecipeArtwork({ recipe, index, featured = false }: { recipe: RecipeSumm
   if (recipe.coverUrl) {
     return (
       <div
-        className={`bg-cover bg-center ${featured ? "h-full" : "h-52"}`}
+        className={`bg-cover bg-center ${featured ? "absolute -inset-px" : "h-52"}`}
         style={{ backgroundImage: `url("${recipe.coverUrl.replaceAll('"', '\\"')}")` }}
         role="img"
         aria-label={`Fotografia de ${recipe.title}`}
@@ -134,7 +135,7 @@ function RecipeArtwork({ recipe, index, featured = false }: { recipe: RecipeSumm
   }
 
   return (
-    <div className={`relative overflow-hidden ${featured ? "h-full" : "h-52"}`} style={{ backgroundColor: colour }} role="img" aria-label={`Ilustração para ${recipe.title}`}>
+    <div className={`relative overflow-hidden ${featured ? "absolute -inset-px" : "h-52"}`} style={{ backgroundColor: colour }} role="img" aria-label={`Ilustração para ${recipe.title}`}>
       <div className="absolute -top-12 -right-10 size-44 rounded-full border-[22px] border-white/28" />
       <div className="absolute -bottom-14 -left-8 size-40 rounded-[44%_56%_63%_37%/55%_44%_56%_45%] bg-white/22" />
       <svg className="absolute inset-0 m-auto h-32 w-32 text-[#2E332C]/76" viewBox="0 0 160 160" fill="none" aria-hidden>
@@ -168,6 +169,8 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<HomeSection>("topo");
   const [favouriteIds, setFavouriteIds] = useState(() => new Set(initialRecipes.filter((recipe) => recipe.isFavourite).map((recipe) => recipe.id)));
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -244,6 +247,26 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [addOpen, profileOpen]);
 
+  useEffect(() => {
+    function updateActiveSection() {
+      const marker = window.scrollY + Math.min(window.innerHeight * 0.28, 220);
+      const discoverTop = document.getElementById("descobrir")?.offsetTop ?? Number.POSITIVE_INFINITY;
+      const recipesTop = document.getElementById("receitas")?.offsetTop ?? Number.POSITIVE_INFINITY;
+
+      if (marker >= recipesTop) setActiveSection("receitas");
+      else if (marker >= discoverTop) setActiveSection("descobrir");
+      else setActiveSection("topo");
+    }
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
+  }, []);
+
   async function signOut() {
     await createClient().auth.signOut();
     router.push("/login");
@@ -300,10 +323,10 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
           <span className="hidden font-serif text-[1.7rem] font-black tracking-[-.04em] lg:inline">Cookbook</span>
         </a>
         <nav aria-label="Navegação principal" className="space-y-1">
-          <NavItem icon="home" label="Início" active href="#topo" />
-          <NavItem icon="book" label="Receitas" href="#receitas" />
-          <NavItem icon="compass" label="Descobrir" href="#descobrir" />
-          <NavButton icon="more" label="Mais" onClick={() => setProfileOpen(true)} />
+          <NavItem icon="home" label="Início" active={!profileOpen && activeSection === "topo"} href="#topo" onClick={() => setActiveSection("topo")} />
+          <NavItem icon="book" label="Receitas" active={!profileOpen && activeSection === "receitas"} href="#receitas" onClick={() => setActiveSection("receitas")} />
+          <NavItem icon="compass" label="Descobrir" active={!profileOpen && activeSection === "descobrir"} href="#descobrir" onClick={() => setActiveSection("descobrir")} />
+          <NavButton icon="more" label="Mais" active={profileOpen} onClick={() => setProfileOpen(true)} />
         </nav>
         <button type="button" onClick={() => setAddOpen(true)} className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5" aria-label="Adicionar ou importar receita">
           <Icon name="plus" size={20} /><span className="hidden lg:inline">Adicionar receita</span>
@@ -316,12 +339,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
       <main id="topo" className="pb-28 md:ml-24 md:pb-10 lg:ml-64">
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
-          <header className="flex items-center justify-between gap-4">
+          <header>
             <div>
               <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">A vossa cozinha</p>
               <h1 className="mt-1 font-serif text-4xl font-black tracking-[-.04em] sm:text-5xl">Olá, {displayName}</h1>
             </div>
-            <button type="button" onClick={() => setAddOpen(true)} className="grid size-12 place-items-center rounded-[47%_53%_61%_39%/44%_42%_58%_56%] bg-[#F36F56] text-white shadow-[0_5px_0_#D94F38] md:hidden" aria-label="Adicionar receita"><Icon name="plus" size={24} /></button>
           </header>
 
           <label className="mt-7 flex min-h-14 items-center gap-3 border-b-2 border-[#CFC6B8] bg-transparent px-1 focus-within:border-[#285240]">
@@ -335,7 +357,15 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
             {([{ id: "favourites", label: "Favoritas" }, { id: "quick", label: "Até 30 min" }, { id: "easy", label: "Fáceis" }] as const).map((option) => <button key={option.id} type="button" onClick={() => toggleQuickFilter(option.id)} aria-pressed={quickFilters.has(option.id)} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-extrabold transition ${quickFilters.has(option.id) ? "bg-[#285240] text-white shadow-[0_3px_0_#193A2B]" : "border border-[#D8D0C4] bg-[#FFFCF6] text-[#716A62] hover:border-[#285240]"}`}>{option.label}</button>)}
           </div>
 
-          {availableTags.length ? <div className="mt-2 flex gap-2 overflow-x-auto pb-2" aria-label="Filtrar por etiquetas">{availableTags.map((tag) => <button key={tag.slug} type="button" onClick={() => toggleTag(tag.slug)} aria-pressed={selectedTags.has(tag.slug)} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-extrabold transition ${selectedTags.has(tag.slug) ? "border-[#27231F] text-[#27231F] shadow-[0_3px_0_#B8B0A5]" : "border-transparent text-[#635D56] hover:border-[#BEB5A9]"}`} style={{ backgroundColor: selectedTags.has(tag.slug) ? tag.color ?? "#F3C565" : `${tag.color ?? "#F3C565"}70` }}>#{tag.name} <span className="opacity-65">{tag.count}</span></button>)}</div> : null}
+          {availableTags.length ? (
+            <div id="etiquetas" className="mt-3 rounded-[1.4rem_1.4rem_2.4rem_1.4rem] border border-[#DDD5C9] bg-[#FFFCF6] px-4 py-3">
+              <button type="button" onClick={() => setTagsOpen((open) => !open)} aria-expanded={tagsOpen} aria-controls="tag-filter-list" className="flex min-h-10 w-full items-center justify-between gap-3 text-left text-sm font-extrabold text-[#285240]">
+                <span><span aria-hidden className="mr-2 text-[#E25B43]">#</span>Todas as etiquetas <span className="font-normal text-[#817970]">({availableTags.length})</span>{selectedTags.size ? <span className="ml-2 rounded-full bg-[#E5EBDD] px-2 py-1 text-[10px]">{selectedTags.size} selecionadas</span> : null}</span>
+                <svg aria-hidden viewBox="0 0 24 24" className={`size-5 shrink-0 transition ${tagsOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              {tagsOpen ? <div id="tag-filter-list" className="flex flex-wrap gap-2 border-t border-[#E7E0D6] pb-1 pt-4" aria-label="Filtrar por etiquetas">{availableTags.map((tag) => <button key={tag.slug} type="button" onClick={() => toggleTag(tag.slug)} aria-pressed={selectedTags.has(tag.slug)} className={`min-h-9 rounded-full border px-3 text-xs font-extrabold transition ${selectedTags.has(tag.slug) ? "border-[#27231F] text-[#27231F] shadow-[0_3px_0_#B8B0A5]" : "border-transparent text-[#635D56] hover:border-[#BEB5A9]"}`} style={{ backgroundColor: selectedTags.has(tag.slug) ? tag.color ?? "#F3C565" : `${tag.color ?? "#F3C565"}70` }}>#{tag.name} <span className="opacity-65">{tag.count}</span></button>)}</div> : null}
+            </div>
+          ) : null}
 
           {feedback ? <p role="status" className="mt-4 bg-[#FBE5DF] px-4 py-3 text-sm font-bold text-[#8B3F27]">{feedback}</p> : null}
 
@@ -345,13 +375,13 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
               <FeaturedRecipeSkeleton />
             ) : featured ? (
               <div className="grid grid-rows-[25rem_18rem] animate-[cookbook-reveal_.28s_ease-out] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
-                <div className="relative flex min-h-0 flex-col justify-between overflow-hidden bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
+                <div className="relative flex min-h-0 flex-col justify-start overflow-hidden bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Para cozinhar hoje</p>
-                    <h2 id="destaque-title" className="mt-4 line-clamp-3 max-w-xl font-serif text-4xl font-black leading-[1.05] tracking-[-.04em] sm:line-clamp-2 sm:text-5xl">{featured.title}</h2>
-                    <p className="mt-4 line-clamp-2 max-w-lg text-sm leading-6 text-white/72">{featured.description || "Uma receita da vossa coleção, pronta para voltar à mesa."}</p>
+                    <h2 id="destaque-title" className="mt-4 line-clamp-2 min-h-[4.75rem] max-w-xl font-serif text-4xl font-black leading-[1.05] tracking-[-.04em] sm:min-h-[6.4rem] sm:text-5xl">{featured.title}</h2>
+                    <p className="mt-4 line-clamp-2 min-h-12 max-w-lg text-sm leading-6 text-white/72">{featured.description || "Uma receita da vossa coleção, pronta para voltar à mesa."}</p>
                   </div>
-                  <div className="mt-9 space-y-4">
+                  <div className="mt-5 space-y-4">
                     <div className="flex items-center gap-3">
                       <span className="inline-flex items-center gap-2 text-sm font-bold"><Icon name="clock" size={18} />{formatMinutes(featured)}</span>
                       {featured.difficulty ? <span className="border-l border-white/25 pl-3 text-sm font-bold">{difficultyLabels[featured.difficulty]}</span> : null}
@@ -433,11 +463,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       </main>
 
       <nav aria-label="Navegação principal" className="safe-bottom fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-[2rem] border border-[#DDD5C9] bg-[#FFFCF6]/96 px-2 py-2 shadow-[0_14px_40px_rgba(53,44,35,.16)] backdrop-blur md:hidden">
-        <a href="#topo" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold text-[#285240]"><span className="grid size-8 place-items-center rounded-[55%_45%_60%_40%] bg-[#E5EBDD]"><Icon name="home" size={18} /></span><span>Início</span></a>
-        <a href="#receitas" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="book" size={19} /><span>Receitas</span></a>
-        <button type="button" onClick={() => setAddOpen(true)} className="mx-auto grid size-14 -translate-y-5 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_6px_0_#D94F38]" aria-label="Adicionar receita"><Icon name="plus" size={26} /></button>
-        <a href="#descobrir" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="compass" size={19} /><span>Descobrir</span></a>
-        <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="more" size={19} /><span>Mais</span></button>
+        <a href="#topo" onClick={() => setActiveSection("topo")} aria-current={!profileOpen && activeSection === "topo" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold ${!profileOpen && activeSection === "topo" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "topo" ? "rounded-[55%_45%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="home" size={18} /></span><span>Início</span></a>
+        <a href="#receitas" onClick={() => setActiveSection("receitas")} aria-current={!profileOpen && activeSection === "receitas" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "receitas" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "receitas" ? "rounded-[48%_52%_38%_62%] bg-[#E5EBDD]" : ""}`}><Icon name="book" size={19} /></span><span>Receitas</span></a>
+        <button type="button" onClick={() => setAddOpen(true)} aria-expanded={addOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold text-[#E25B43]" aria-label="Adicionar receita"><span className="grid size-9 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_3px_0_#D94F38]"><Icon name="plus" size={21} /></span><span>Adicionar</span></button>
+        <a href="#descobrir" onClick={() => setActiveSection("descobrir")} aria-current={!profileOpen && activeSection === "descobrir" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "descobrir" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "descobrir" ? "rounded-[52%_48%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="compass" size={19} /></span><span>Descobrir</span></a>
+        <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} aria-current={profileOpen ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${profileOpen ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${profileOpen ? "rounded-[55%_45%_42%_58%] bg-[#E5EBDD]" : ""}`}><Icon name="more" size={19} /></span><span>Mais</span></button>
       </nav>
 
       {profileOpen ? (

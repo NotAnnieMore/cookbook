@@ -84,9 +84,9 @@ export default function RecipeHero({
               </dl>
             </div>
           </div>
-          <div className="relative h-full min-h-0 overflow-hidden bg-[#F2A58B]">
+          <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: palette.colour }}>
             {coverUrl ? (
-              <div role="img" aria-label={`Fotografia de ${title}`} className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${coverUrl.replaceAll('"', '\\"')}")` }} />
+              <div role="img" aria-label={`Fotografia de ${title}`} className="absolute -inset-px bg-cover bg-center" style={{ backgroundImage: `url("${coverUrl.replaceAll('"', '\\"')}")` }} />
             ) : (
               <svg aria-hidden className="absolute inset-0 m-auto size-52" style={{ color: palette.colour }} viewBox="0 0 220 220" fill="none">
                 <ellipse cx="110" cy="132" rx="72" ry="38" fill="#FFF9ED" stroke="currentColor" strokeWidth="5" />

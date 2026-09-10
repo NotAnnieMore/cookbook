@@ -12,6 +12,14 @@ function hueDistance(first: number, second: number) {
   return Math.min(distance, 360 - distance);
 }
 
+function seededIndex(seed: string, length: number) {
+  const hash = [...seed].reduce(
+    (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
+    2166136261,
+  );
+  return hash % length;
+}
+
 function rgbHue(red: number, green: number, blue: number) {
   const r = red / 255;
   const g = green / 255;
@@ -29,11 +37,7 @@ function rgbHue(red: number, green: number, blue: number) {
 }
 
 export function fallbackRecipeColour(seed: string) {
-  const hash = [...seed].reduce(
-    (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
-    2166136261,
-  );
-  return panelPalette[hash % panelPalette.length].colour;
+  return panelPalette[seededIndex(seed, panelPalette.length)].colour;
 }
 
 export function panelColourFromPixels(
@@ -65,9 +69,13 @@ export function panelColourFromPixels(
   if (totalWeight === 0) return fallbackRecipeColour(fallbackSeed);
   const photoHue = (Math.atan2(y, x) * 180) / Math.PI;
   const complementaryHue = ((photoHue + 360) % 360 + 180) % 360;
-  return [...panelPalette].sort(
+  const complementaryOptions = [...panelPalette].sort(
     (first, second) =>
       hueDistance(first.hue, complementaryHue) -
       hueDistance(second.hue, complementaryHue),
-  )[0].colour;
+  ).slice(0, 3);
+
+  return complementaryOptions[
+    seededIndex(`${fallbackSeed}:${Math.round(photoHue / 12)}`, complementaryOptions.length)
+  ].colour;
 }
