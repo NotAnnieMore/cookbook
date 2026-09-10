@@ -47,3 +47,18 @@ test("splits emoji bullets, preparation steps and ingredient groups from TikTok"
   assert.equal(result.draft?.steps.length, 8);
   assert.deepEqual(result.draft?.tags, ["semifrio", "caramelosalgado", "toffee"]);
 });
+
+test("accepts the misspelled preparation heading used by a real TikTok caption", () => {
+  const realCaption = "Tiramisú lotus biscoff  Este Tiramisú  de lotus é delicioso a cada colherada, cheio sabor e super fácil fazer.Sobremesa perfeita. Guarda já a receita  Ingredientes: 👉400gr mascarpone 👉 creme biscoff lotus 👉2colheres sopa açúcar 👉 Bolachas lotus 👉2ovos 👉 café  q.b Prepração: 👉Separar as gemas das claras. 👉Numa tigela colocar mascarpone, gemas, açúcar e bater bem. 👉Bater as claras em castelo e juntar ao preparado anterior. 👉Podem colocar 1colher sopa creme lotus ao creme, ou deixar simples 👉Molhar as bolachas lotus em café, e colocar em camadas,bolacha, creme ,ate terminar com creme. 👉Por cima colocar o creme lotus e levar ao frigorífico. 👉 triturei bolachas e coloquei dos lados mas é opcional. #speculoos #tiramisu #receitinhas #pastry #lotusbiscoff #feitocomamor #cookingram #biscoff #lotus";
+  const result = extractRecipeFromTikTokOEmbed(JSON.stringify({
+    provider_name: "TikTok",
+    author_name: "A Pimenta Rosa",
+    title: realCaption,
+  }));
+
+  assert.equal(result.error, null);
+  assert.equal(result.draft?.title, "Tiramisú lotus biscoff");
+  assert.equal(result.draft?.ingredients.length, 6);
+  assert.equal(result.draft?.ingredients[2].unit, "c. sopa");
+  assert.equal(result.draft?.steps.length, 7);
+});

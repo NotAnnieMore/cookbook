@@ -30,17 +30,15 @@ const responseSchema = {
     activeTime: { type: "STRING", description: "Hands-on preparation duration from the source, or an empty string." },
     totalTime: { type: "STRING", description: "Total duration from the source, including waiting, or an empty string." },
     difficulty: { type: "STRING", description: "Only easy, medium or hard when explicit; otherwise an empty string." },
-    tags: { type: "ARRAY", items: { type: "STRING" }, maxItems: 12 },
+    tags: { type: "ARRAY", items: { type: "STRING" } },
     ingredientGroups: {
       type: "ARRAY",
-      maxItems: 20,
       items: {
         type: "OBJECT",
         properties: {
           name: { type: "STRING", description: "Section such as Base or Recheio; empty when absent." },
           items: {
             type: "ARRAY",
-            maxItems: 80,
             items: { type: "STRING", description: "One complete ingredient line, preserving its stated amount and unit." },
           },
         },
@@ -49,12 +47,11 @@ const responseSchema = {
     },
     preparationSections: {
       type: "ARRAY",
-      maxItems: 20,
       items: {
         type: "OBJECT",
         properties: {
           name: { type: "STRING", description: "Preparation section name; empty when absent." },
-          steps: { type: "ARRAY", maxItems: 80, items: { type: "STRING" } },
+          steps: { type: "ARRAY", items: { type: "STRING" } },
         },
         required: ["name", "steps"],
       },
