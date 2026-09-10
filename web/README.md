@@ -8,6 +8,7 @@ Interface web/PWA do Cookbook, construída com Next.js, React, TypeScript e Tail
 npm install
 npm run dev
 npm run lint
+npm test
 npm run build
 ```
 
@@ -19,8 +20,18 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 
 - layout responsivo para telemóvel e tablet/desktop;
 - navegação inferior e sidebar;
-- pesquisa sobre receitas reais;
+- pesquisa por nome, ingrediente, autor ou etiqueta e filtros combináveis;
 - criação manual com doses, tempos, ingredientes e passos;
+- edição com aviso Realtime e controlo de versão no servidor;
+- fotografia principal no Storage privado, validada e convertida para WebP;
+- caixote temporário e restauro;
+- grupos de ingredientes e secções de preparação;
+- escala visual de doses com apresentação métrica legível;
+- intervalos como `2–3` e embalagens como `1 lata de 397 g`;
+- conversões de medidas americanas com preservação dos valores originais;
+- etiquetas partilhadas e filtros por favorito, duração, dificuldade e etiqueta;
+- importação de texto com parser determinístico, rate limit e preview obrigatório;
+- cartões de destaque com cor complementar escolhida a partir da fotografia;
 - leitura completa de cada receita;
 - favoritos individuais persistidos;
 - escolha aleatória;
@@ -36,7 +47,7 @@ O projeto Supabase está ligado e a primeira camada de autenticação está impl
 - schema com RLS, Realtime e Storage privado preparado no projeto remoto;
 - atualização em tempo real da coleção e dos favoritos entre Ivo e Ana.
 
-A importação por website, TikTok, Instagram e texto continua marcada como a próxima
-fase. A IA será usada como fallback quando a extração estruturada não for suficiente.
+A próxima fase é a importação por website, TikTok e Instagram. A IA será usada
+como fallback quando a extração estruturada não for suficiente.
 
 O contexto completo encontra-se em `../Cookbook_Project_Context/`.

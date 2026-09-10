@@ -1,5 +1,12 @@
 export type RecipeDifficulty = "easy" | "medium" | "hard" | null;
 
+export type RecipeTag = {
+  id: string;
+  name: string;
+  slug: string;
+  color: string | null;
+};
+
 export type RecipeSummary = {
   id: string;
   title: string;
@@ -11,4 +18,6 @@ export type RecipeSummary = {
   isFavourite: boolean;
   coverUrl: string | null;
   updatedAt: string;
+  ingredientNames: string[];
+  tags: RecipeTag[];
 };

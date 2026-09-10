@@ -9,9 +9,19 @@ linguagem visual quente, editorial e assumidamente culinária.
 - autenticação privada para contas criadas manualmente;
 - coleção de receitas partilhada entre os membros da casa;
 - criação manual com doses, tempos, dificuldade, ingredientes e passos;
-- medidas europeias por defeito;
+- edição protegida contra conflitos entre dispositivos;
+- fotografia principal privada, validada e otimizada automaticamente para WebP;
+- caixote temporário com restauro de receitas;
+- grupos de ingredientes e secções de preparação;
+- ajuste temporário das quantidades ao número de pessoas;
+- intervalos de quantidade e tamanho real de latas/embalagens;
+- medidas europeias por defeito, conversões americanas e referências por ingrediente;
+- importação de texto com preservação da fonte e preview editável obrigatório;
+- etiquetas e filtros combináveis;
+- painéis de destaque com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;
-- pesquisa, destaque aleatório e página completa de cada receita;
+- pesquisa por receita, ingrediente, autor ou etiqueta, destaque aleatório e
+  página completa de cada receita;
 - sincronização em tempo real de receitas e favoritos;
 - interface responsiva com navegação própria para telemóvel e tablet/desktop;
 - Row Level Security e armazenamento privado preparados na Supabase.
@@ -68,13 +78,14 @@ A aplicação fica disponível em `http://127.0.0.1:3000`.
 ```powershell
 cd web
 npm run lint
+npm test
 npm run build
 ```
 
 ## Próximas fases
 
-- edição, fotografias e eliminação recuperável de receitas;
-- importação por websites, TikTok, Instagram e texto;
+- substituição da fotografia principal e galeria;
+- importação por websites, TikTok e Instagram;
 - extração estruturada com IA apenas como fallback;
 - modo cozinha com gestos, progresso e temporizadores;
 - backups exportáveis e recuperação testada.

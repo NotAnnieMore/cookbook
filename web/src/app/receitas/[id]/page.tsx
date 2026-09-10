@@ -4,6 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 import FavouriteButton from "./favourite-button";
+import RecipeContent from "./recipe-content";
+import RecipeMenu from "./recipe-menu";
 
 const difficultyLabels = {
   easy: "Fácil",
@@ -27,8 +29,9 @@ function displayQuantity(value: number | string | null) {
     : String(value);
 }
 
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ aviso?: string }> }) {
   const { id } = await params;
+  const { aviso } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -39,7 +42,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const [recipeResult, favouriteResult] = await Promise.all([
     supabase
       .from("recipes")
-      .select("id,title,description,servings,servings_label,active_time_minutes,total_time_minutes,difficulty,created_by,recipe_ingredients(id,ingredient_name,optional,quantity_normalized,unit_normalized,display_text_normalized,sort_order),recipe_steps(id,instruction,timer_seconds,sort_order),recipe_images(storage_path,image_kind)")
+      .select("id,title,description,servings,servings_label,active_time_minutes,total_time_minutes,difficulty,created_by,version,ingredient_groups(id,name,sort_order),recipe_sections(id,name,sort_order),recipe_ingredients(id,group_id,ingredient_name,optional,scalable,quantity_normalized,quantity_max_normalized,unit_normalized,package_quantity,package_unit,sort_order),recipe_steps(id,section_id,instruction,timer_seconds,sort_order),recipe_images(storage_path,image_kind),recipe_tags(tags(id,name,slug,color))")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -67,6 +70,18 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
     : { data: null };
   const ingredients = [...(recipe.recipe_ingredients ?? [])].sort((a, b) => a.sort_order - b.sort_order);
   const steps = [...(recipe.recipe_steps ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const ingredientGroups = new Map(
+    (recipe.ingredient_groups ?? []).map((group) => [group.id, group.name]),
+  );
+  const stepSections = new Map(
+    (recipe.recipe_sections ?? []).map((section) => [section.id, section.name]),
+  );
+  const tags = (recipe.recipe_tags ?? []).flatMap((recipeTag) => {
+    const tag = Array.isArray(recipeTag.tags)
+      ? recipeTag.tags[0]
+      : recipeTag.tags;
+    return tag ? [tag] : [];
+  });
 
   return (
     <main className="min-h-screen bg-[#F8F4EC] pb-20 text-[#27231F]">
@@ -79,18 +94,23 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
       </header>
 
       <article className="mx-auto max-w-6xl px-5 sm:px-8">
+        {aviso === "fotografia" ? <p role="status" className="mb-5 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">A receita foi atualizada, mas não foi possível guardar a fotografia.</p> : null}
         <section className="overflow-hidden rounded-[2rem_2rem_5rem_2rem] bg-[#285240] text-white shadow-[0_14px_0_#E3DCD0]">
           <div className="grid lg:grid-cols-[1.05fr_.95fr]">
-            <div className="flex min-h-[25rem] flex-col justify-center p-7 sm:p-11 lg:p-14">
+            <div className="relative isolate flex min-h-[25rem] flex-col justify-center overflow-hidden p-7 sm:p-11 lg:p-14">
+              {signedCover?.signedUrl ? <><div aria-hidden className="absolute -inset-12 -z-20 scale-125 bg-cover bg-center opacity-45 blur-3xl saturate-125" style={{ backgroundImage: `url("${signedCover.signedUrl.replaceAll('"', '\\"')}")` }} /><div aria-hidden className="absolute inset-0 -z-10 bg-[#173B30]/78" /></> : null}
+              <div className="relative z-10">
               <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Receita de {author?.display_name ?? "Cookbook"}</p>
               <h1 className="mt-4 max-w-3xl font-serif text-5xl font-black leading-[.98] tracking-[-.05em] sm:text-6xl">{recipe.title}</h1>
               {recipe.description ? <p className="mt-6 max-w-2xl leading-7 text-white/72">{recipe.description}</p> : null}
+              {tags.length ? <div className="mt-5 flex flex-wrap gap-2" aria-label="Etiquetas da receita">{tags.map((tag) => <span key={tag.id} className="rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-extrabold">#{tag.name}</span>)}</div> : null}
               <dl className="mt-9 flex flex-wrap gap-x-8 gap-y-4 border-t border-white/20 pt-6">
                 <div><dt className="text-[11px] font-extrabold uppercase tracking-wider text-white/55">Tempo ativo</dt><dd className="mt-1 font-serif text-lg font-bold">{formatMinutes(recipe.active_time_minutes)}</dd></div>
                 <div><dt className="text-[11px] font-extrabold uppercase tracking-wider text-white/55">Tempo total</dt><dd className="mt-1 font-serif text-lg font-bold">{formatMinutes(recipe.total_time_minutes)}</dd></div>
                 {recipe.servings ? <div><dt className="text-[11px] font-extrabold uppercase tracking-wider text-white/55">Rende</dt><dd className="mt-1 font-serif text-lg font-bold">{displayQuantity(recipe.servings)} {recipe.servings_label ?? "pessoas"}</dd></div> : null}
                 {recipe.difficulty ? <div><dt className="text-[11px] font-extrabold uppercase tracking-wider text-white/55">Dificuldade</dt><dd className="mt-1 font-serif text-lg font-bold">{difficultyLabels[recipe.difficulty as keyof typeof difficultyLabels]}</dd></div> : null}
               </dl>
+              </div>
             </div>
             <div className="relative min-h-80 overflow-hidden rounded-t-[6rem] bg-[#F2A58B] lg:min-h-full lg:rounded-l-[8rem] lg:rounded-t-none">
               {signedCover?.signedUrl ? (
@@ -106,37 +126,35 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           </div>
         </section>
 
-        <div className="mt-14 grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-          <section aria-labelledby="ingredients-title">
-            <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">À mão</p>
-            <h2 id="ingredients-title" className="mt-1 font-serif text-4xl font-black tracking-[-.04em]">Ingredientes</h2>
-            <ul className="mt-7 divide-y divide-[#D9D1C5] border-y-2 border-[#D9D1C5]">
-              {ingredients.map((ingredient) => {
-                const quantity = displayQuantity(ingredient.quantity_normalized);
-                return (
-                  <li key={ingredient.id} className="flex min-h-14 items-center gap-3 py-3">
-                    <span className="size-2.5 shrink-0 rounded-[45%_55%_58%_42%] bg-[#F36F56]" />
-                    <span className="flex-1 font-semibold">{ingredient.ingredient_name}{ingredient.optional ? <span className="ml-2 text-xs font-normal text-[#766F67]">opcional</span> : null}</span>
-                    <strong className="text-right text-sm text-[#285240]">{quantity} {ingredient.unit_normalized ?? ""}</strong>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          <section aria-labelledby="steps-title">
-            <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Vamos cozinhar</p>
-            <h2 id="steps-title" className="mt-1 font-serif text-4xl font-black tracking-[-.04em]">Preparação</h2>
-            <ol className="mt-7 space-y-5">
-              {steps.map((step, index) => (
-                <li key={step.id} className="grid grid-cols-[3rem_1fr] gap-4 rounded-[1.5rem_1.5rem_3rem_1.5rem] bg-[#FFFCF6] p-5 sm:p-6">
-                  <span className="grid size-11 place-items-center rounded-[55%_45%_58%_42%/48%_57%_43%_52%] bg-[#F3C565] font-serif text-xl font-black">{index + 1}</span>
-                  <p className="pt-2 leading-7">{step.instruction}</p>
-                </li>
-              ))}
-            </ol>
-          </section>
+        <div className="mt-8 flex justify-end">
+          <RecipeMenu recipeId={recipe.id} recipeTitle={recipe.title} version={recipe.version} />
         </div>
+
+        <RecipeContent
+          baseServings={recipe.servings}
+          servingsLabel={recipe.servings_label ?? "pessoas"}
+          ingredients={ingredients.map((ingredient) => ({
+            id: ingredient.id,
+            name: ingredient.ingredient_name,
+            optional: ingredient.optional,
+            scalable: ingredient.scalable,
+            quantity: ingredient.quantity_normalized,
+            quantityMax: ingredient.quantity_max_normalized,
+            unit: ingredient.unit_normalized,
+            packageQuantity: ingredient.package_quantity,
+            packageUnit: ingredient.package_unit,
+            groupName: ingredient.group_id
+              ? ingredientGroups.get(ingredient.group_id) ?? null
+              : null,
+          }))}
+          steps={steps.map((step) => ({
+            id: step.id,
+            instruction: step.instruction,
+            sectionName: step.section_id
+              ? stepSections.get(step.section_id) ?? null
+              : null,
+          }))}
+        />
       </article>
     </main>
   );

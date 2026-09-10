@@ -8,6 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/client";
 
+import { useAdaptiveRecipeColour } from "./use-adaptive-recipe-colour";
+
 type IconName =
   | "home"
   | "book"
@@ -30,6 +32,7 @@ const difficultyLabels = {
 } as const;
 
 const cardColours = ["#F2A58B", "#F3C565", "#A9C7B2", "#AFC9DA"];
+type QuickFilter = "favourites" | "quick" | "easy";
 
 function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -114,6 +117,12 @@ function formatMinutes(recipe: RecipeSummary) {
 export default function CookbookHome({ displayName, userId, initialRecipes }: { displayName: string; userId: string; initialRecipes: RecipeSummary[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(
+    () => new Set(),
+  );
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [favouriteIds, setFavouriteIds] = useState(() => new Set(initialRecipes.filter((recipe) => recipe.isFavourite).map((recipe) => recipe.id)));
@@ -125,6 +134,8 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       .channel(`cookbook-home-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "recipes" }, () => router.refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "recipe_favorites" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "recipe_tags" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tags" }, () => router.refresh())
       .subscribe();
 
     return () => {
@@ -132,13 +143,48 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     };
   }, [router, userId]);
 
+  const availableTags = useMemo(() => {
+    const tags = new Map<string, { name: string; slug: string; color: string | null; count: number }>();
+    for (const recipe of initialRecipes) {
+      for (const tag of recipe.tags) {
+        const current = tags.get(tag.slug);
+        tags.set(tag.slug, {
+          name: tag.name,
+          slug: tag.slug,
+          color: tag.color,
+          count: (current?.count ?? 0) + 1,
+        });
+      }
+    }
+    return [...tags.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-PT"),
+    );
+  }, [initialRecipes]);
+
   const filteredRecipes = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("pt-PT");
-    if (!normalized) return initialRecipes;
-    return initialRecipes.filter((recipe) => `${recipe.title} ${recipe.description ?? ""}`.toLocaleLowerCase("pt-PT").includes(normalized));
-  }, [initialRecipes, query]);
+    return initialRecipes.filter((recipe) => {
+      const searchable = `${recipe.title} ${recipe.description ?? ""} ${recipe.createdByName} ${recipe.ingredientNames.join(" ")} ${recipe.tags.map((tag) => tag.name).join(" ")}`.toLocaleLowerCase("pt-PT");
+      const matchesSearch = !normalized || searchable.includes(normalized);
+      const matchesQuickFilters =
+        (!quickFilters.has("favourites") || favouriteIds.has(recipe.id)) &&
+        (!quickFilters.has("quick") ||
+          (recipe.totalTimeMinutes ??
+            recipe.activeTimeMinutes ??
+            Number.POSITIVE_INFINITY) <= 30) &&
+        (!quickFilters.has("easy") || recipe.difficulty === "easy");
+      const matchesTags = [...selectedTags].every((slug) =>
+        recipe.tags.some((tag) => tag.slug === slug),
+      );
+      return matchesSearch && matchesQuickFilters && matchesTags;
+    });
+  }, [favouriteIds, initialRecipes, query, quickFilters, selectedTags]);
 
   const featured = initialRecipes.length > 0 ? initialRecipes[featuredIndex % initialRecipes.length] : null;
+  const featuredPanelColour = useAdaptiveRecipeColour(
+    featured?.coverUrl,
+    featured?.id,
+  );
   const profileInitial = displayName.trim().charAt(0).toLocaleUpperCase("pt-PT") || "U";
 
   async function toggleFavourite(recipeId: string) {
@@ -163,6 +209,26 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     router.refresh();
   }
 
+  function toggleQuickFilter(filter: QuickFilter) {
+    setQuickFilters((current) => {
+      const next = new Set(current);
+      if (next.has(filter)) next.delete(filter);
+      else next.add(filter);
+      return next;
+    });
+  }
+
+  function toggleTag(slug: string) {
+    setSelectedTags((current) => {
+      const next = new Set(current);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
+
+  const hasActiveFilters = quickFilters.size > 0 || selectedTags.size > 0;
+
   return (
     <div className="min-h-screen bg-[#F8F4EC] text-[#27231F]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col border-r border-[#DDD5C9] bg-[#FFFCF6] px-3 py-6 md:flex lg:w-64 lg:px-6">
@@ -174,7 +240,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
           <NavItem icon="home" label="Início" active href="#topo" />
           <NavItem icon="book" label="Receitas" href="#receitas" />
           <NavItem icon="compass" label="Descobrir" href="#descobrir" />
-          <NavItem icon="more" label="Mais" href="#mais" />
+          <NavItem icon="more" label="Caixote" href="/caixote" />
         </nav>
         <Link href="/receitas/nova" className="mt-7 flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5">
           <Icon name="plus" size={20} /><span className="hidden lg:inline">Nova receita</span>
@@ -198,16 +264,23 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
           <label className="mt-7 flex min-h-14 items-center gap-3 border-b-2 border-[#CFC6B8] bg-transparent px-1 focus-within:border-[#285240]">
             <span className="text-[#746D64]"><Icon name="search" /></span>
             <span className="sr-only">Pesquisar receitas</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar na nossa coleção…" className="w-full bg-transparent py-3 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#948D83]" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por receita ou ingrediente…" className="w-full bg-transparent py-3 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#948D83]" />
           </label>
+
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Filtros rápidos">
+            <button type="button" onClick={() => { setQuickFilters(new Set()); setSelectedTags(new Set()); }} aria-pressed={!hasActiveFilters} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-extrabold transition ${!hasActiveFilters ? "bg-[#285240] text-white shadow-[0_3px_0_#193A2B]" : "border border-[#D8D0C4] bg-[#FFFCF6] text-[#716A62] hover:border-[#285240]"}`}>Todas</button>
+            {([{ id: "favourites", label: "Favoritas" }, { id: "quick", label: "Até 30 min" }, { id: "easy", label: "Fáceis" }] as const).map((option) => <button key={option.id} type="button" onClick={() => toggleQuickFilter(option.id)} aria-pressed={quickFilters.has(option.id)} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-extrabold transition ${quickFilters.has(option.id) ? "bg-[#285240] text-white shadow-[0_3px_0_#193A2B]" : "border border-[#D8D0C4] bg-[#FFFCF6] text-[#716A62] hover:border-[#285240]"}`}>{option.label}</button>)}
+          </div>
+
+          {availableTags.length ? <div className="mt-2 flex gap-2 overflow-x-auto pb-2" aria-label="Filtrar por etiquetas">{availableTags.map((tag) => <button key={tag.slug} type="button" onClick={() => toggleTag(tag.slug)} aria-pressed={selectedTags.has(tag.slug)} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-extrabold transition ${selectedTags.has(tag.slug) ? "border-[#27231F] text-[#27231F] shadow-[0_3px_0_#B8B0A5]" : "border-transparent text-[#635D56] hover:border-[#BEB5A9]"}`} style={{ backgroundColor: selectedTags.has(tag.slug) ? tag.color ?? "#F3C565" : `${tag.color ?? "#F3C565"}70` }}>#{tag.name} <span className="opacity-65">{tag.count}</span></button>)}</div> : null}
 
           {feedback ? <p role="status" className="mt-4 bg-[#FBE5DF] px-4 py-3 text-sm font-bold text-[#8B3F27]">{feedback}</p> : null}
 
-          <section id="descobrir" className="relative mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] bg-[#285240] text-white shadow-[0_16px_0_#E4DDD1]" aria-labelledby="destaque-title">
+          <section id="descobrir" className="relative mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1] transition-colors duration-500" style={{ backgroundColor: featuredPanelColour }} aria-labelledby="destaque-title">
             <div className="absolute -top-20 right-[34%] size-44 rounded-full border-[24px] border-white/7" />
             {featured ? (
               <div className="grid lg:grid-cols-[1fr_1.05fr]">
-                <div className="relative flex flex-col justify-between p-7 sm:p-9 lg:p-11">
+                <div className="relative flex flex-col justify-between bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Para cozinhar hoje</p>
                     <h2 id="destaque-title" className="mt-4 max-w-xl font-serif text-4xl font-black leading-[1.05] tracking-[-.04em] sm:text-5xl">{featured.title}</h2>
@@ -220,7 +293,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                     <button type="button" onClick={() => setFeaturedIndex((current) => (current + 1) % initialRecipes.length)} className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F]"><Icon name="shuffle" size={18} />Outra</button>
                   </div>
                 </div>
-                <div className="relative min-h-72 overflow-hidden rounded-t-[5rem] lg:rounded-t-none lg:rounded-l-[7rem]">
+                <div className="relative min-h-72 overflow-hidden lg:rounded-l-[7rem]">
                   <RecipeArtwork recipe={featured} index={featuredIndex} featured />
                 </div>
               </div>
@@ -250,7 +323,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Guardadas com carinho</p>
                 <h2 id="receitas-title" className="mt-1 font-serif text-3xl font-black tracking-[-.035em] sm:text-4xl">Todas as receitas</h2>
               </div>
-              <span className="font-serif text-lg font-bold text-[#7B746B]">{initialRecipes.length}</span>
+              <span className="font-serif text-lg font-bold text-[#7B746B]">{filteredRecipes.length}<span className="text-sm font-normal">/{initialRecipes.length}</span></span>
             </div>
 
             {filteredRecipes.length > 0 ? (
@@ -265,6 +338,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                         <div>
                           <p className="text-xs font-bold text-[#7B746B]">Por {recipe.createdByName}</p>
                           <h3 className="mt-1 font-serif text-2xl font-black leading-tight tracking-[-.025em]"><Link href={`/receitas/${recipe.id}`} className="hover:text-[#285240]">{recipe.title}</Link></h3>
+                          {recipe.tags.length ? <div className="mt-2 flex flex-wrap gap-1.5">{recipe.tags.slice(0, 3).map((tag) => <span key={tag.id} className="rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#453F39]" style={{ backgroundColor: `${tag.color ?? "#F3C565"}80` }}>#{tag.name}</span>)}</div> : null}
                         </div>
                         <button type="button" onClick={() => void toggleFavourite(recipe.id)} aria-pressed={favouriteIds.has(recipe.id)} aria-label={favouriteIds.has(recipe.id) ? `Remover ${recipe.title} dos favoritos` : `Adicionar ${recipe.title} aos favoritos`} className={`grid size-11 shrink-0 place-items-center rounded-[52%_48%_38%_62%/55%_42%_58%_45%] transition ${favouriteIds.has(recipe.id) ? "bg-[#FBE0D8] text-[#E25B43]" : "bg-[#F0ECE5] text-[#777067] hover:text-[#E25B43]"}`}><Icon name="heart" size={19} /></button>
                       </div>
@@ -285,7 +359,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
           <footer id="mais" className="mt-14 flex flex-col gap-3 border-t border-[#DDD5C9] py-7 text-sm text-[#746D64] sm:flex-row sm:items-center sm:justify-between">
             <p className="font-serif font-bold">Cookbook · feito para a nossa mesa.</p>
-            <button type="button" onClick={async () => { await createClient().auth.signOut(); router.push("/login"); router.refresh(); }} className="min-h-11 self-start rounded-full px-4 font-extrabold text-[#285240] hover:bg-[#E5EBDD] sm:self-auto">Terminar sessão</button>
+            <div className="flex flex-wrap items-center gap-2"><Link href="/caixote" className="min-h-11 rounded-full px-4 py-3 font-extrabold text-[#285240] hover:bg-[#E5EBDD]">Abrir caixote</Link><button type="button" onClick={async () => { await createClient().auth.signOut(); router.push("/login"); router.refresh(); }} className="min-h-11 self-start rounded-full px-4 font-extrabold text-[#285240] hover:bg-[#E5EBDD] sm:self-auto">Terminar sessão</button></div>
           </footer>
         </div>
       </main>
@@ -295,7 +369,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
         <a href="#receitas" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="book" size={19} /><span>Receitas</span></a>
         <button type="button" onClick={() => setAddOpen(true)} className="mx-auto grid size-14 -translate-y-5 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_6px_0_#D94F38]" aria-label="Adicionar receita"><Icon name="plus" size={26} /></button>
         <a href="#descobrir" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="compass" size={19} /><span>Descobrir</span></a>
-        <a href="#mais" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="more" size={19} /><span>Mais</span></a>
+        <Link href="/caixote" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="more" size={19} /><span>Mais</span></Link>
       </nav>
 
       {addOpen ? (
@@ -311,7 +385,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                 <span className="grid size-12 shrink-0 place-items-center rounded-[47%_53%_60%_40%] bg-[#E5EBDD] text-[#285240]"><Icon name="chef" size={22} /></span>
                 <span className="min-w-0 flex-1"><strong className="block">Criar manualmente</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Título, tempos, ingredientes e passos</span></span><Icon name="arrow" size={18} />
               </Link>
-              {[{ icon: "link" as const, title: "Importar ligação", description: "Website, TikTok ou Instagram" }, { icon: "text" as const, title: "Importar texto", description: "Disponível na fase de importação" }].map((option) => (
+              <Link href="/receitas/importar/texto" className="flex min-h-20 items-center gap-4 border-b border-[#DED6CA] py-3 text-left transition hover:border-[#F36F56]">
+                <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#AFC9DA]/60 text-[#285240]"><Icon name="text" size={21} /></span>
+                <span className="min-w-0 flex-1"><strong className="block">Importar texto</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Colar, rever medidas e confirmar</span></span><Icon name="arrow" size={18} />
+              </Link>
+              {[{ icon: "link" as const, title: "Importar ligação", description: "Website, TikTok ou Instagram" }].map((option) => (
                 <div key={option.title} className="flex min-h-20 items-center gap-4 border-b border-[#E6DED3] py-3 text-left opacity-55">
                   <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#FBE0D8] text-[#E25B43]"><Icon name={option.icon} size={21} /></span>
                   <span className="min-w-0 flex-1"><strong className="block">{option.title}</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">{option.description}</span></span><span className="text-[10px] font-extrabold uppercase tracking-wider">Em breve</span>

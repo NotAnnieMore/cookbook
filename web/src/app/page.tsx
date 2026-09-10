@@ -32,7 +32,7 @@ export default async function Home() {
       supabase
         .from("recipes")
         .select(
-          "id,title,description,active_time_minutes,total_time_minutes,difficulty,created_by,updated_at,recipe_images(storage_path,image_kind)",
+          "id,title,description,active_time_minutes,total_time_minutes,difficulty,created_by,updated_at,recipe_images(storage_path,image_kind),recipe_ingredients(ingredient_name),recipe_tags(tags(id,name,slug,color))",
         )
         .is("deleted_at", null)
         .order("updated_at", { ascending: false }),
@@ -93,6 +93,15 @@ export default async function Home() {
         ? signedCoverUrls.get(coverPaths[index] as string) ?? null
         : null,
       updatedAt: recipe.updated_at,
+      ingredientNames: (recipe.recipe_ingredients ?? []).map(
+        (ingredient) => ingredient.ingredient_name,
+      ),
+      tags: (recipe.recipe_tags ?? []).flatMap((recipeTag) => {
+        const tag = Array.isArray(recipeTag.tags)
+          ? recipeTag.tags[0]
+          : recipeTag.tags;
+        return tag ? [tag] : [];
+      }),
     }),
   );
 
