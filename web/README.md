@@ -37,6 +37,8 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 - importação TikTok por oEmbed, limpeza de links de partilha, parsing de listas inline,
   grupos e hashtags, remoção de emojis, normalização de espaços e capitalização
   dos ingredientes e passos;
+- importação Instagram para posts e reels, com limpeza do link, leitura dos
+  metadados públicos e fallback assistido para colar a descrição;
 - cartões de destaque com dimensões estáveis e cor complementar escolhida a partir da fotografia;
 - skeletons de navegação e de análise de imagem, sem flashes da paleta provisória;
 - leitura completa de cada receita;
@@ -54,8 +56,8 @@ O projeto Supabase está ligado e a primeira camada de autenticação está impl
 - schema com RLS, Realtime e Storage privado preparado no projeto remoto;
 - atualização em tempo real da coleção e dos favoritos entre Ivo e Ana.
 
-A próxima fase é o adaptador dedicado para Instagram e a extração multimodal dos
-vídeos. A IA será usada como fallback quando a legenda, os dados estruturados e
-o HTML não forem suficientes.
+A próxima fase é a extração com IA quando a legenda, os dados estruturados e o
+HTML não forem suficientes. A eventual leitura multimodal de vídeos permanece
+um fallback posterior e explícito.
 
 O contexto completo encontra-se em `../Cookbook_Project_Context/`.

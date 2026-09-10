@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 
+import { canonicalInstagramPostUrl, extractRecipeFromInstagramHtml, prepareInstagramCaption } from "@/lib/recipes/instagram-import";
 import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, prepareTikTokCaption } from "@/lib/recipes/tiktok-import";
 import { cleanImportedText, sanitizeImportedRecipe } from "@/lib/recipes/import-sanitizer";
 import { parseRecipeText } from "@/lib/recipes/text-import";
@@ -21,6 +22,7 @@ export type UrlImportState = {
   sourceTitle?: string | null;
   needsSourceText?: boolean;
   publicCaption?: string | null;
+  sourceKind?: "instagram" | "tiktok" | "website";
 };
 
 export async function analyseRecipeUrl(
@@ -38,12 +40,16 @@ export async function analyseRecipeUrl(
   } catch (error) {
     return { message: error instanceof SafeUrlError ? error.message : "O endereço não é válido." };
   }
+  const tikTokUrl = canonicalTikTokVideoUrl(normalizedUrl.toString());
+  const instagramUrl = canonicalInstagramPostUrl(normalizedUrl.toString());
+  const socialUrl = tikTokUrl ?? instagramUrl;
+  const sourceKind = tikTokUrl ? "tiktok" : instagramUrl ? "instagram" : "website";
   const sourceTextValue = formData.get("source_text_override");
   const sourceText = typeof sourceTextValue === "string" && sourceTextValue.trim()
     ? sourceTextSchema.safeParse(sourceTextValue)
     : null;
   if (sourceText && !sourceText.success) {
-    return { message: "O texto deve ter entre 20 e 30 000 caracteres.", sourceUrl: normalizedUrl.toString(), needsSourceText: true };
+    return { message: "O texto deve ter entre 20 e 30 000 caracteres.", sourceUrl: socialUrl ?? normalizedUrl.toString(), needsSourceText: true, sourceKind };
   }
 
   const supabase = await createClient();
@@ -86,20 +92,25 @@ export async function analyseRecipeUrl(
     .single();
   if (jobError || !job) return { message: "Não foi possível registar esta importação." };
 
-  let sourceUrl = normalizedUrl.toString();
+  let sourceUrl = socialUrl ?? normalizedUrl.toString();
   let result: UrlImportResult | null = null;
   let usedTikTokAdapter = false;
-  const tikTokUrl = canonicalTikTokVideoUrl(sourceUrl);
-  let publicTikTokCaption: string | null = null;
+  let usedInstagramAdapter = false;
+  let publicSocialCaption: string | null = null;
+  let fetchedPage: Awaited<ReturnType<typeof fetchPublicRecipePage>> | null = null;
 
   if (sourceText?.success) {
-    const parsedText = parseRecipeText(tikTokUrl ? prepareTikTokCaption(sourceText.data) : sourceText.data);
+    const preparedText = tikTokUrl
+      ? prepareTikTokCaption(sourceText.data)
+      : instagramUrl
+        ? prepareInstagramCaption(sourceText.data)
+        : sourceText.data;
+    const parsedText = parseRecipeText(preparedText);
     result = {
       ...parsedText,
       sourceTitle: parsedText.draft?.title ?? null,
       usedStructuredData: true,
     };
-    sourceUrl = tikTokUrl ?? sourceUrl;
   }
 
   if (!result && tikTokUrl) {
@@ -108,7 +119,7 @@ export async function analyseRecipeUrl(
     try {
       const oEmbedPage = await fetchPublicRecipePage(oEmbedUrl.toString());
       const tikTokResult = extractRecipeFromTikTokOEmbed(oEmbedPage.html);
-      publicTikTokCaption = tikTokResult.caption;
+      publicSocialCaption = tikTokResult.caption;
       if (tikTokResult.draft && !tikTokResult.error) {
         sourceUrl = tikTokUrl;
         usedTikTokAdapter = true;
@@ -125,10 +136,37 @@ export async function analyseRecipeUrl(
     }
   }
 
+  if (!result && instagramUrl) {
+    try {
+      fetchedPage = await fetchPublicRecipePage(instagramUrl);
+      const instagramResult = extractRecipeFromInstagramHtml(fetchedPage.html);
+      publicSocialCaption = instagramResult.caption;
+      if (instagramResult.draft && !instagramResult.error) {
+        usedInstagramAdapter = true;
+        result = {
+          draft: instagramResult.draft,
+          warnings: instagramResult.warnings,
+          error: null,
+          sourceTitle: instagramResult.draft.title,
+          usedStructuredData: true,
+        };
+      }
+    } catch {
+      // Public Instagram pages frequently require login; assisted paste remains available.
+      result = {
+        draft: null,
+        warnings: [],
+        error: "O Instagram bloqueou a leitura automática desta publicação.",
+        sourceTitle: null,
+        usedStructuredData: false,
+      };
+    }
+  }
+
   if (!result) {
     let page: Awaited<ReturnType<typeof fetchPublicRecipePage>>;
     try {
-      page = await fetchPublicRecipePage(normalizedUrl.toString());
+      page = fetchedPage ?? await fetchPublicRecipePage(socialUrl ?? normalizedUrl.toString());
     } catch (error) {
       const safeError = error instanceof SafeUrlError
         ? error
@@ -141,7 +179,7 @@ export async function analyseRecipeUrl(
       }).eq("id", job.id);
       return { message: `${safeError.message} Podes sempre copiar o texto da receita e usar “Importar texto”.` };
     }
-    sourceUrl = page.finalUrl;
+    sourceUrl = socialUrl ?? page.finalUrl;
     result = extractRecipeFromHtml(page.html);
   }
 
@@ -149,19 +187,22 @@ export async function analyseRecipeUrl(
   if (!result.draft || result.error) {
     const message = tikTokUrl
       ? "O TikTok só disponibilizou uma legenda curta, sem ingredientes e preparação suficientes."
-      : "Não encontrei ingredientes e preparação suficientes nessa página.";
+      : instagramUrl
+        ? "O Instagram não disponibilizou uma descrição pública com ingredientes e preparação suficientes."
+        : "Não encontrei ingredientes e preparação suficientes nessa página.";
     await supabase.from("import_jobs").update({
       status: "failed",
       error_code: "URL_STRUCTURE_NOT_FOUND",
       error_message: result.error ?? message,
       completed_at: new Date().toISOString(),
     }).eq("id", job.id);
-    return tikTokUrl
+    return socialUrl
       ? {
-          message: `${message} Cola abaixo o texto completo que vês no TikTok e mantemos este link como origem.`,
-          sourceUrl: tikTokUrl,
+          message: `${message} Cola abaixo o texto completo que vês na publicação e mantemos este link como origem.`,
+          sourceUrl: socialUrl,
           needsSourceText: true,
-          publicCaption: publicTikTokCaption,
+          publicCaption: publicSocialCaption,
+          sourceKind,
         }
       : { message: `${message} Experimenta “Importar texto” para teres controlo total.` };
   }
@@ -169,10 +210,12 @@ export async function analyseRecipeUrl(
   const sanitizedDraft = sanitizeImportedRecipe(result.draft);
 
   const warnings = [...result.warnings];
-  if (sourceText?.success && tikTokUrl) {
-    warnings.unshift("Receita extraída do texto que colaste; o link do TikTok ficou guardado como fonte original.");
+  if (sourceText?.success && socialUrl) {
+    warnings.unshift(`Receita extraída do texto que colaste; o link do ${instagramUrl ? "Instagram" : "TikTok"} ficou guardado como fonte original.`);
   } else if (usedTikTokAdapter) {
     warnings.unshift("Descrição pública obtida diretamente do TikTok; confirma as quantidades, pois muitos vídeos não as indicam.");
+  } else if (usedInstagramAdapter) {
+    warnings.unshift("Descrição pública obtida diretamente do Instagram; confirma as quantidades, pois muitas publicações não as indicam.");
   } else if (!result.usedStructuredData) {
     warnings.unshift("Este website não forneceu uma receita estruturada; confirma com atenção o texto extraído da página.");
   }
@@ -191,5 +234,6 @@ export async function analyseRecipeUrl(
     importJobId: job.id,
     sourceUrl,
     sourceTitle: result.sourceTitle ? cleanImportedText(result.sourceTitle) : null,
+    sourceKind,
   };
 }

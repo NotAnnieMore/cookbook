@@ -22,6 +22,8 @@ linguagem visual quente, editorial e assumidamente culinária.
 - adaptador TikTok via oEmbed, com separação automática de listas inline e grupos,
   remoção de emojis, limpeza de espaços repetidos e capitalização de ingredientes
   e preparação;
+- adaptador Instagram para posts e reels públicos, com links canónicos, extração
+  de legendas públicas e fallback assistido quando a plataforma bloqueia a leitura;
 - etiquetas e filtros combináveis;
 - painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;
@@ -90,7 +92,7 @@ npm run build
 ## Próximas fases
 
 - galeria de fotografias por receita;
-- adaptador dedicado para Instagram e extração multimodal de vídeos;
+- extração com IA e eventual leitura multimodal apenas como fallback;
 - extração estruturada com IA apenas como fallback;
 - modo cozinha com gestos, progresso e temporizadores;
 - backups exportáveis e recuperação testada.

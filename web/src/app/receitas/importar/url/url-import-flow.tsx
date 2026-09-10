@@ -11,6 +11,7 @@ const initialState: UrlImportState = {};
 
 export default function UrlImportFlow({ displayName }: { displayName: string }) {
   const [state, action, pending] = useActionState(analyseRecipeUrl, initialState);
+  const socialName = state.sourceKind === "instagram" ? "Instagram" : state.sourceKind === "tiktok" ? "TikTok" : "publicação";
 
   if (state.draft && state.importJobId) {
     let sourceHost = "website";
@@ -48,13 +49,13 @@ export default function UrlImportFlow({ displayName }: { displayName: string }) 
         <input id="source-url" name="source_url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" required maxLength={2048} defaultValue={state.sourceUrl} className="mt-5 min-h-14 w-full rounded-2xl border-2 border-[#D8D0C4] bg-[#F8F4EC] px-5 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#999187] focus:border-[#285240] focus:ring-4 focus:ring-[#285240]/10" placeholder="https://exemplo.com/receita" />
         <details className="mt-4 rounded-2xl bg-[#F8F4EC] px-4 py-3 text-sm text-[#6F6860]">
           <summary className="cursor-pointer font-extrabold text-[#285240]">O que conseguimos ler</summary>
-          <p className="mt-3 leading-6">Procuramos primeiro dados Schema.org próprios para receitas. Quando não existem, tentamos interpretar o conteúdo visível e os metadados públicos. Sites privados, páginas que exigem login ou bloqueiam automação podem não funcionar.</p>
+          <p className="mt-3 leading-6">Procuramos primeiro dados Schema.org próprios para receitas. No TikTok e Instagram, tentamos também organizar a descrição pública da publicação. Sites privados, páginas que exigem login ou bloqueiam automação podem não funcionar.</p>
         </details>
         {state.message ? <p role="alert" className="mt-5 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">{state.message}</p> : null}
         {state.needsSourceText ? (
           <div className="mt-5 rounded-[1.5rem_1.5rem_3rem_1.5rem] border-2 border-[#E0C475] bg-[#FFF8E7] p-5">
-            <label htmlFor="source-text-override" className="font-serif text-xl font-black">Texto completo mostrado no TikTok</label>
-            <p className="mt-2 text-sm leading-6 text-[#74633E]">Copia a descrição/receita que aparece por baixo do vídeo. Pode estar em inglês e ter ingredientes e passos na mesma linha.</p>
+            <label htmlFor="source-text-override" className="font-serif text-xl font-black">Texto completo mostrado no {socialName}</label>
+            <p className="mt-2 text-sm leading-6 text-[#74633E]">Copia a descrição/receita que aparece na publicação. Pode estar em inglês e ter ingredientes e passos na mesma linha.</p>
             {state.publicCaption ? <p className="mt-3 rounded-2xl bg-white/65 px-4 py-3 text-xs leading-5 text-[#746D64]"><strong>Legenda que conseguimos ler:</strong> {state.publicCaption}</p> : null}
             <textarea id="source-text-override" name="source_text_override" required minLength={20} maxLength={30000} className="mt-4 min-h-64 w-full resize-y rounded-2xl border border-[#D8C58E] bg-[#FFFCF6] p-4 text-base leading-7 outline-none focus:border-[#285240] focus:ring-4 focus:ring-[#285240]/10" placeholder={`Honey Glazed Bacon Wrapped Garlic Chicken Bites\n\nIngredients:\n* Garlic chicken bites\n* Bacon\n* Honey\n\nInstructions:\n1. Prepare…`} />
           </div>
