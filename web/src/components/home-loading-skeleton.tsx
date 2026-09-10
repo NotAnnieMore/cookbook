@@ -34,8 +34,8 @@ export default function HomeLoadingSkeleton() {
           </div>
 
           <section className="mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] bg-[#E8E0D4] shadow-[0_16px_0_#E4DDD1]">
-            <div className="grid min-h-[37rem] animate-pulse lg:min-h-96 lg:grid-cols-[1fr_1.05fr]">
-              <div className="flex flex-col justify-between p-7 sm:p-9 lg:p-11">
+            <div className="grid grid-rows-[25rem_18rem] animate-pulse sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
+              <div className="flex min-h-0 flex-col justify-between overflow-hidden p-7 sm:p-9 lg:p-11">
                 <div>
                   <div className="flex items-center gap-3"><ChefMark /><span className="text-xs font-extrabold uppercase tracking-[.18em] text-[#746D64]">A preparar a mesa…</span></div>
                   <div className="mt-6 h-10 w-4/5 rounded-full bg-[#CEC3B5]" />
@@ -45,7 +45,7 @@ export default function HomeLoadingSkeleton() {
                 </div>
                 <div className="mt-9 grid grid-cols-2 gap-3"><div className="h-11 rounded-full bg-[#D4CABC]" /><div className="h-11 rounded-full bg-[#D4CABC]" /></div>
               </div>
-              <div className="min-h-72 bg-[#D7CDC0] lg:rounded-l-[7rem]" />
+              <div className="h-full bg-[#D7CDC0]" />
             </div>
           </section>
 

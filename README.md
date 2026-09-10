@@ -8,9 +8,10 @@ linguagem visual quente, editorial e assumidamente culinária.
 
 - autenticação privada para contas criadas manualmente;
 - coleção de receitas partilhada entre os membros da casa;
-- criação manual com doses, tempos, dificuldade, ingredientes e passos;
+- criação manual com doses, tempo ativo, tempo total em horas/minutos, dificuldade, ingredientes e passos;
 - edição protegida contra conflitos entre dispositivos;
-- fotografia principal privada, validada e otimizada automaticamente para WebP;
+- fotografia principal privada, com enquadramento 3:2 escolhido pelo utilizador,
+  validação e otimização automática para WebP;
 - caixote temporário com restauro de receitas;
 - grupos de ingredientes e secções de preparação;
 - ajuste temporário das quantidades ao número de pessoas;
@@ -18,7 +19,8 @@ linguagem visual quente, editorial e assumidamente culinária.
 - medidas europeias por defeito, conversões americanas e referências por ingrediente;
 - importação de texto com preservação da fonte e preview editável obrigatório;
 - importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
-- adaptador TikTok via oEmbed, com separação automática de listas inline, emojis e grupos;
+- adaptador TikTok via oEmbed, com separação automática de listas inline e grupos,
+  remoção de emojis e limpeza de espaços repetidos;
 - etiquetas e filtros combináveis;
 - painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;

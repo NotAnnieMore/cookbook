@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, prepareTikTokCaption } from "@/lib/recipes/tiktok-import";
+import { cleanImportedText, sanitizeImportedRecipe } from "@/lib/recipes/import-sanitizer";
 import { parseRecipeText } from "@/lib/recipes/text-import";
 import { extractRecipeFromHtml, type UrlImportResult } from "@/lib/recipes/url-import";
 import { fetchPublicRecipePage, parsePublicHttpUrl, SafeUrlError } from "@/lib/safe-url-fetch";
@@ -165,6 +166,8 @@ export async function analyseRecipeUrl(
       : { message: `${message} Experimenta “Importar texto” para teres controlo total.` };
   }
 
+  const sanitizedDraft = sanitizeImportedRecipe(result.draft);
+
   const warnings = [...result.warnings];
   if (sourceText?.success && tikTokUrl) {
     warnings.unshift("Receita extraída do texto que colaste; o link do TikTok ficou guardado como fonte original.");
@@ -176,17 +179,17 @@ export async function analyseRecipeUrl(
   const { error: previewError } = await supabase.from("import_jobs").update({
     status: "preview",
     source_url: sourceUrl,
-    result_draft: result.draft,
+    result_draft: sanitizedDraft,
     error_code: null,
     error_message: null,
   }).eq("id", job.id);
   if (previewError) return { message: "O preview foi criado, mas não foi possível guardá-lo." };
 
   return {
-    draft: result.draft,
+    draft: sanitizedDraft,
     warnings,
     importJobId: job.id,
     sourceUrl,
-    sourceTitle: result.sourceTitle,
+    sourceTitle: result.sourceTitle ? cleanImportedText(result.sourceTitle) : null,
   };
 }

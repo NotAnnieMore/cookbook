@@ -29,7 +29,7 @@ function HeroSkeleton() {
           {[0, 1, 2, 3].map((item) => <div key={item} className="h-12 rounded-2xl bg-[#D4CABC]" />)}
         </div>
       </div>
-      <div className="min-h-80 bg-[#D7CDC0] lg:rounded-l-[8rem]" />
+      <div className="min-h-80 bg-[#D7CDC0]" />
       <span className="sr-only">A carregar fotografia e cores da receita.</span>
     </div>
   );
@@ -83,7 +83,7 @@ export default function RecipeHero({
               </dl>
             </div>
           </div>
-          <div className="relative min-h-80 overflow-hidden bg-[#F2A58B] lg:min-h-full lg:rounded-l-[8rem]">
+          <div className="relative min-h-80 overflow-hidden bg-[#F2A58B] lg:min-h-full">
             {coverUrl ? (
               <div role="img" aria-label={`Fotografia de ${title}`} className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${coverUrl.replaceAll('"', '\\"')}")` }} />
             ) : (

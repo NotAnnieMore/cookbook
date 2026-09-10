@@ -21,9 +21,10 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 - layout responsivo para telemóvel e tablet/desktop;
 - navegação inferior e sidebar;
 - pesquisa por nome, ingrediente, autor ou etiqueta e filtros combináveis;
-- criação manual com doses, tempos, ingredientes e passos;
+- criação manual com doses, tempo ativo e tempo total em horas/minutos, ingredientes e passos;
 - edição com aviso Realtime e controlo de versão no servidor;
-- fotografia principal no Storage privado, validada e convertida para WebP;
+- fotografia principal no Storage privado, com recorte 3:2 escolhido antes do upload,
+  validação e conversão para WebP;
 - caixote temporário e restauro;
 - grupos de ingredientes e secções de preparação;
 - escala visual de doses com apresentação métrica legível;
@@ -32,8 +33,9 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 - etiquetas partilhadas e filtros por favorito, duração, dificuldade e etiqueta;
 - importação de texto com parser determinístico, rate limit e preview obrigatório;
 - importação por URL com proteção SSRF, limites de rede, Schema.org, fallback HTML e preview obrigatório;
-- importação TikTok por oEmbed, limpeza de links de partilha e parsing de listas inline com emojis, grupos e hashtags;
-- cartões de destaque na coleção e no detalhe com cor complementar escolhida a partir da fotografia;
+- importação TikTok por oEmbed, limpeza de links de partilha, parsing de listas inline,
+  grupos e hashtags, remoção de emojis e normalização de espaços;
+- cartões de destaque com dimensões estáveis e cor complementar escolhida a partir da fotografia;
 - skeletons de navegação e de análise de imagem, sem flashes da paleta provisória;
 - leitura completa de cada receita;
 - favoritos individuais persistidos;

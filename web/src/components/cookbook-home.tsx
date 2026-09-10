@@ -94,8 +94,8 @@ function NavButton({ icon, label, onClick }: { icon: IconName; label: string; on
 
 function FeaturedRecipeSkeleton() {
   return (
-    <div className="grid min-h-[37rem] animate-pulse bg-[#E8E0D4] lg:min-h-96 lg:grid-cols-[1fr_1.05fr]" role="status" aria-label="A preparar o destaque">
-      <div className="flex flex-col justify-between p-7 sm:p-9 lg:p-11">
+    <div className="grid grid-rows-[25rem_18rem] animate-pulse bg-[#E8E0D4] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none" role="status" aria-label="A preparar o destaque">
+      <div className="flex min-h-0 flex-col justify-between overflow-hidden p-7 sm:p-9 lg:p-11">
         <div>
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-[45%_55%_62%_38%/42%_44%_56%_58%] bg-[#F36F56] text-white">
@@ -113,7 +113,7 @@ function FeaturedRecipeSkeleton() {
           <div className="h-11 rounded-full bg-[#D4CABC]" />
         </div>
       </div>
-      <div className="min-h-72 bg-[#D7CDC0] lg:rounded-l-[7rem]" />
+      <div className="h-full bg-[#D7CDC0]" />
       <span className="sr-only">A carregar fotografia e cores da receita.</span>
     </div>
   );
@@ -125,7 +125,7 @@ function RecipeArtwork({ recipe, index, featured = false }: { recipe: RecipeSumm
   if (recipe.coverUrl) {
     return (
       <div
-        className={`bg-cover bg-center ${featured ? "min-h-72 lg:min-h-96" : "h-52"}`}
+        className={`bg-cover bg-center ${featured ? "h-full" : "h-52"}`}
         style={{ backgroundImage: `url("${recipe.coverUrl.replaceAll('"', '\\"')}")` }}
         role="img"
         aria-label={`Fotografia de ${recipe.title}`}
@@ -134,7 +134,7 @@ function RecipeArtwork({ recipe, index, featured = false }: { recipe: RecipeSumm
   }
 
   return (
-    <div className={`relative overflow-hidden ${featured ? "min-h-72 lg:min-h-96" : "h-52"}`} style={{ backgroundColor: colour }} role="img" aria-label={`Ilustração para ${recipe.title}`}>
+    <div className={`relative overflow-hidden ${featured ? "h-full" : "h-52"}`} style={{ backgroundColor: colour }} role="img" aria-label={`Ilustração para ${recipe.title}`}>
       <div className="absolute -top-12 -right-10 size-44 rounded-full border-[22px] border-white/28" />
       <div className="absolute -bottom-14 -left-8 size-40 rounded-[44%_56%_63%_37%/55%_44%_56%_45%] bg-white/22" />
       <svg className="absolute inset-0 m-auto h-32 w-32 text-[#2E332C]/76" viewBox="0 0 160 160" fill="none" aria-hidden>
@@ -344,12 +344,12 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
             {featured && !featuredPalette.isReady ? (
               <FeaturedRecipeSkeleton />
             ) : featured ? (
-              <div className="grid animate-[cookbook-reveal_.28s_ease-out] lg:grid-cols-[1fr_1.05fr]">
-                <div className="relative flex flex-col justify-between bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
+              <div className="grid grid-rows-[25rem_18rem] animate-[cookbook-reveal_.28s_ease-out] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
+                <div className="relative flex min-h-0 flex-col justify-between overflow-hidden bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Para cozinhar hoje</p>
-                    <h2 id="destaque-title" className="mt-4 max-w-xl font-serif text-4xl font-black leading-[1.05] tracking-[-.04em] sm:text-5xl">{featured.title}</h2>
-                    <p className="mt-4 max-w-lg text-sm leading-6 text-white/72">{featured.description || "Uma receita da vossa coleção, pronta para voltar à mesa."}</p>
+                    <h2 id="destaque-title" className="mt-4 line-clamp-3 max-w-xl font-serif text-4xl font-black leading-[1.05] tracking-[-.04em] sm:line-clamp-2 sm:text-5xl">{featured.title}</h2>
+                    <p className="mt-4 line-clamp-2 max-w-lg text-sm leading-6 text-white/72">{featured.description || "Uma receita da vossa coleção, pronta para voltar à mesa."}</p>
                   </div>
                   <div className="mt-9 space-y-4">
                     <div className="flex items-center gap-3">
@@ -362,7 +362,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                     </div>
                   </div>
                 </div>
-                <div className="relative min-h-72 overflow-hidden lg:rounded-l-[7rem]">
+                <div className="relative h-full min-h-0 overflow-hidden">
                   <RecipeArtwork recipe={featured} index={featuredIndex} featured />
                 </div>
               </div>
