@@ -115,7 +115,7 @@ export default async function EditRecipePage({
   const updateAction = updateRecipe.bind(null, recipe.id, recipe.version);
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] text-[#27231F]">
+    <main className="relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] text-[#27231F]">
       <AppDecorations tone="blue" />
       <StickyPageHeader href={`/receitas/${recipe.id}`} label="Voltar à receita" />
       <header className="relative z-10 mx-auto max-w-5xl px-5 pb-9 pt-8 sm:px-8 sm:pt-10">

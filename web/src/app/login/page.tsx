@@ -1,4 +1,5 @@
 import { LoginForm } from "./login-form";
+import { CookbookMascotMark } from "@/components/cookbook-mascot";
 
 export default function LoginPage() {
   return (
@@ -8,9 +9,7 @@ export default function LoginPage() {
         <div className="absolute right-[-8rem] bottom-[-10rem] size-[34rem] rounded-full bg-[#C65D3B]/35 blur-sm" />
 
         <div className="relative flex items-center gap-3">
-          <span className="grid size-12 place-items-center rounded-2xl bg-white/12 text-2xl" aria-hidden>
-            ♨
-          </span>
+          <CookbookMascotMark className="size-12" />
           <span className="font-serif text-3xl font-bold">Cookbook</span>
         </div>
 
@@ -30,9 +29,7 @@ export default function LoginPage() {
       <section className="flex items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-md">
           <div className="mb-10 flex items-center gap-3 text-[#365B3C] lg:hidden">
-            <span className="grid size-11 place-items-center rounded-2xl bg-[#365B3C] text-xl text-white" aria-hidden>
-              ♨
-            </span>
+            <CookbookMascotMark className="size-11" />
             <span className="font-serif text-2xl font-bold">Cookbook</span>
           </div>
 

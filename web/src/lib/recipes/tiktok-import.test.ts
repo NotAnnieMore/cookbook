@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, prepareTikTokCaption } from "./tiktok-import.ts";
+import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, isTikTokShortUrl, prepareTikTokCaption } from "./tiktok-import.ts";
 
 const caption = `Honey Glazed Bacon Wrapped Garlic Chicken Bites
 Indulge in these delicious savory and sweet bites.  **Ingredients:**  * Garlic chicken bites * Bacon * Honey  **Instructions:**  1. Prepare your garlic chicken bites. 2. Wrap each chicken bite with a strip of bacon. 3. Cook until crispy. 4. Glaze generously with honey.`;
@@ -12,6 +12,13 @@ test("removes TikTok sharing parameters from a direct video URL", () => {
     "https://www.tiktok.com/@shewillevolve/video/7636525672646724895",
   );
   assert.equal(canonicalTikTokVideoUrl("https://example.com/video/123"), null);
+});
+
+test("recognizes TikTok short links that need resolving", () => {
+  assert.equal(isTikTokShortUrl("https://vm.tiktok.com/ZGdQrB31s/"), true);
+  assert.equal(isTikTokShortUrl("https://vt.tiktok.com/ZS123_example"), true);
+  assert.equal(isTikTokShortUrl("https://www.tiktok.com/@cook/video/123"), false);
+  assert.equal(isTikTokShortUrl("https://vm.tiktok.com/too/many/parts"), false);
 });
 
 test("turns an inline TikTok caption into parseable recipe sections", () => {

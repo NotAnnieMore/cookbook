@@ -35,7 +35,7 @@ export default async function TrashPage() {
   const recipes = recipesResult.data ?? [];
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] pb-20 text-[#27231F]">
+    <main className="relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] pb-20 text-[#27231F]">
       <AppDecorations tone="warm" />
       <StickyPageHeader />
       <header className="relative z-10 mx-auto max-w-5xl px-5 pb-10 pt-8 sm:px-8 sm:pt-10">

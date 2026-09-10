@@ -4,11 +4,11 @@ import { z } from "zod";
 
 import { canonicalInstagramPostUrl, extractRecipeFromInstagramHtml, prepareInstagramCaption } from "@/lib/recipes/instagram-import";
 import { extractRecipeWithGemini, type GeminiImportOutcome } from "@/lib/recipes/gemini-import";
-import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, prepareTikTokCaption } from "@/lib/recipes/tiktok-import";
+import { canonicalTikTokVideoUrl, extractRecipeFromTikTokOEmbed, isTikTokShortUrl, prepareTikTokCaption } from "@/lib/recipes/tiktok-import";
 import { cleanImportedText, sanitizeImportedRecipe } from "@/lib/recipes/import-sanitizer";
 import { parseRecipeText } from "@/lib/recipes/text-import";
 import { extractReadableRecipeText, extractRecipeFromHtml, type UrlImportResult } from "@/lib/recipes/url-import";
-import { fetchPublicRecipePage, parsePublicHttpUrl, SafeUrlError } from "@/lib/safe-url-fetch";
+import { fetchPublicRecipePage, parsePublicHttpUrl, resolvePublicHttpUrl, SafeUrlError } from "@/lib/safe-url-fetch";
 import { createClient } from "@/lib/supabase/server";
 
 const urlSchema = z.string().trim().min(8).max(2_048);
@@ -41,10 +41,11 @@ export async function analyseRecipeUrl(
   } catch (error) {
     return { message: error instanceof SafeUrlError ? error.message : "O endereço não é válido." };
   }
-  const tikTokUrl = canonicalTikTokVideoUrl(normalizedUrl.toString());
+  let tikTokUrl = canonicalTikTokVideoUrl(normalizedUrl.toString());
+  const shortTikTokUrl = isTikTokShortUrl(normalizedUrl.toString());
   const instagramUrl = canonicalInstagramPostUrl(normalizedUrl.toString());
-  const socialUrl = tikTokUrl ?? instagramUrl;
-  const sourceKind = tikTokUrl ? "tiktok" : instagramUrl ? "instagram" : "website";
+  let socialUrl = tikTokUrl ?? instagramUrl;
+  let sourceKind: NonNullable<UrlImportState["sourceKind"]> = tikTokUrl || shortTikTokUrl ? "tiktok" : instagramUrl ? "instagram" : "website";
   const sourceTextValue = formData.get("source_text_override");
   const sourceText = typeof sourceTextValue === "string" && sourceTextValue.trim()
     ? sourceTextSchema.safeParse(sourceTextValue)
@@ -77,6 +78,21 @@ export async function analyseRecipeUrl(
   if (countError) return { message: "Não foi possível iniciar a importação. Tenta novamente." };
   if ((count ?? 0) >= 10) {
     return { message: "Foram feitas várias tentativas seguidas. Aguarda alguns minutos antes de voltar a analisar." };
+  }
+
+  if (shortTikTokUrl && !tikTokUrl) {
+    try {
+      const resolvedUrl = await resolvePublicHttpUrl(normalizedUrl.toString());
+      tikTokUrl = canonicalTikTokVideoUrl(resolvedUrl);
+    } catch (error) {
+      const message = error instanceof SafeUrlError ? error.message : "Não foi possível abrir o link curto do TikTok.";
+      return { message: `${message} Experimenta copiar novamente a ligação a partir do TikTok.`, sourceUrl: normalizedUrl.toString(), sourceKind: "tiktok" };
+    }
+    if (!tikTokUrl) {
+      return { message: "O link curto abriu, mas não apontou para um vídeo público do TikTok.", sourceUrl: normalizedUrl.toString(), sourceKind: "tiktok" };
+    }
+    socialUrl = tikTokUrl;
+    sourceKind = "tiktok";
   }
 
   const { data: job, error: jobError } = await supabase

@@ -35,7 +35,7 @@ export default async function NewRecipePage() {
   const displayName = profile?.display_name || nameFromEmail(user.email);
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] text-[#27231F]">
+    <main className="relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] text-[#27231F]">
       <AppDecorations tone="warm" />
       <StickyPageHeader />
       <header className="relative z-10 mx-auto max-w-5xl px-5 pb-9 pt-8 sm:px-8 sm:pt-10">

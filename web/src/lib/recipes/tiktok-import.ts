@@ -21,6 +21,18 @@ export function canonicalTikTokVideoUrl(input: string) {
   return `https://www.tiktok.com/@${encodeURIComponent(decodeURIComponent(match[1]))}/video/${match[2]}`;
 }
 
+export function isTikTokShortUrl(input: string) {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return false;
+  }
+  const hostname = url.hostname.toLocaleLowerCase("en-US").replace(/^www\./, "");
+  return (hostname === "vm.tiktok.com" || hostname === "vt.tiktok.com")
+    && /^\/[a-z0-9_-]+\/?$/i.test(url.pathname);
+}
+
 export function prepareTikTokCaption(caption: string) {
   return prepareSocialRecipeCaption(caption);
 }

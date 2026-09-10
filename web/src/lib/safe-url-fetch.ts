@@ -32,7 +32,7 @@ function decodeBody(buffer: Buffer, contentType: string) {
     : buffer.toString("utf8");
 }
 
-async function requestPage(url: URL, redirectCount: number): Promise<{ html: string; finalUrl: string; contentType: string }> {
+async function requestPage(url: URL, redirectCount: number, readBody = true): Promise<{ html: string; finalUrl: string; contentType: string }> {
   if (redirectCount > MAX_REDIRECTS) {
     throw new SafeUrlError("TOO_MANY_REDIRECTS", "O website fez demasiados redirecionamentos.");
   }
@@ -68,7 +68,12 @@ async function requestPage(url: URL, redirectCount: number): Promise<{ html: str
             reject(error);
             return;
           }
-          void requestPage(nextUrl, redirectCount + 1).then(resolve, reject);
+          void requestPage(nextUrl, redirectCount + 1, readBody).then(resolve, reject);
+          return;
+        }
+        if (!readBody) {
+          response.resume();
+          resolve({ html: "", finalUrl: url.toString(), contentType: String(response.headers["content-type"] ?? "").toLocaleLowerCase("en-US") });
           return;
         }
         if (status < 200 || status >= 300) {
@@ -123,4 +128,10 @@ async function requestPage(url: URL, redirectCount: number): Promise<{ html: str
 export async function fetchPublicRecipePage(input: string) {
   const url = parsePublicHttpUrl(input);
   return requestPage(url, 0);
+}
+
+export async function resolvePublicHttpUrl(input: string) {
+  const url = parsePublicHttpUrl(input);
+  const result = await requestPage(url, 0, false);
+  return result.finalUrl;
 }

@@ -97,7 +97,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   const sourceUrl = externalSourceUrl(recipe.source_url);
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] pb-20 text-[#27231F]">
+    <main className="relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] pb-20 text-[#27231F]">
       <AppDecorations tone="mixed" />
       <StickyPageHeader maxWidth="max-w-6xl">
         <FavouriteButton recipeId={recipe.id} userId={user.id} initialFavourite={Boolean(favouriteResult.data)} />

@@ -9,6 +9,7 @@ import type { RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/client";
 
 import AppDecorations from "./app-decorations";
+import { CookbookMascotLoader, CookbookMascotMark } from "./cookbook-mascot";
 import { useAdaptiveRecipeColour } from "./use-adaptive-recipe-colour";
 
 type IconName =
@@ -23,7 +24,6 @@ type IconName =
   | "shuffle"
   | "link"
   | "text"
-  | "chef"
   | "trash"
   | "logout"
   | "arrow";
@@ -51,7 +51,6 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
     shuffle: <><path d="M3 7h3c4 0 5 10 9 10h6"/><path d="m18 14 3 3-3 3"/><path d="M3 17h3c1.4 0 2.4-1.2 3.3-2.8M14.4 7.8C15.6 7.2 17 7 18 7h3"/><path d="m18 4 3 3-3 3"/></>,
     link: <><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/></>,
     text: <><path d="M4 6h16M10 6v12M7 18h6"/></>,
-    chef: <><path d="M6 11a4 4 0 0 1 1-7.8A5 5 0 0 1 16.8 4 4 0 0 1 18 11"/><path d="M6 11v9h12v-9M9 16h6"/></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></>,
     logout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></>,
     arrow: <><path d="M5 12h14M14 7l5 5-5 5"/></>,
@@ -65,11 +64,7 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
 }
 
 function BrandMark() {
-  return (
-    <span className="relative grid size-11 place-items-center rounded-[45%_55%_62%_38%/42%_44%_56%_58%] bg-[#F36F56] text-white shadow-[0_5px_0_#D94F38]">
-      <Icon name="chef" size={23} />
-    </span>
-  );
+  return <CookbookMascotMark className="size-11 drop-shadow-[0_4px_0_#D7CFC3]" />;
 }
 
 function NavItem({ icon, label, href, active = false, onClick }: { icon: IconName; label: string; href: string; active?: boolean; onClick?: () => void }) {
@@ -100,9 +95,7 @@ function FeaturedRecipeSkeleton() {
       <div className="flex min-h-0 flex-col justify-between overflow-hidden p-7 sm:p-9 lg:p-11">
         <div>
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-[45%_55%_62%_38%/42%_44%_56%_58%] bg-[#F36F56] text-white">
-              <Icon name="chef" size={21} />
-            </span>
+            <CookbookMascotMark className="size-10" />
             <span className="text-xs font-extrabold uppercase tracking-[.18em] text-[#746D64]">A preparar a mesa…</span>
           </div>
           <div className="mt-6 h-10 w-4/5 rounded-full bg-[#CEC3B5]" />
@@ -115,7 +108,7 @@ function FeaturedRecipeSkeleton() {
           <div className="h-11 rounded-full bg-[#D4CABC]" />
         </div>
       </div>
-      <div className="h-full bg-[#D7CDC0]" />
+      <div className="grid h-full place-items-center bg-[#D7CDC0]"><CookbookMascotLoader className="size-32 sm:size-40" /></div>
       <span className="sr-only">A carregar fotografia e cores da receita.</span>
     </div>
   );
@@ -521,7 +514,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
             </div>
             <div className="mt-7 space-y-3">
               <Link href="/receitas/nova" className="flex min-h-20 items-center gap-4 border-b border-[#DED6CA] py-3 text-left transition hover:border-[#F36F56]">
-                <span className="grid size-12 shrink-0 place-items-center rounded-[47%_53%_60%_40%] bg-[#E5EBDD] text-[#285240]"><Icon name="chef" size={22} /></span>
+                <CookbookMascotMark className="size-12 shrink-0" />
                 <span className="min-w-0 flex-1"><strong className="block">Criar manualmente</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Título, tempos, ingredientes e passos</span></span><Icon name="arrow" size={18} />
               </Link>
               <Link href="/receitas/importar/texto" className="flex min-h-20 items-center gap-4 border-b border-[#DED6CA] py-3 text-left transition hover:border-[#F36F56]">
