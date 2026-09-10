@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import CookbookHome from "@/components/cookbook-home";
+import HomeLoadingSkeleton from "@/components/home-loading-skeleton";
 import type { RecipeDifficulty, RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +14,7 @@ function nameFromEmail(email: string | undefined) {
   return localPart.charAt(0).toLocaleUpperCase("pt-PT") + localPart.slice(1);
 }
 
-export default async function Home() {
+async function HomeContent() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -115,5 +117,13 @@ export default async function Home() {
       userId={user.id}
       initialRecipes={recipes}
     />
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<HomeLoadingSkeleton />}>
+      <HomeContent />
+    </Suspense>
   );
 }

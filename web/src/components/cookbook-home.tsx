@@ -23,6 +23,8 @@ type IconName =
   | "link"
   | "text"
   | "chef"
+  | "trash"
+  | "logout"
   | "arrow";
 
 const difficultyLabels = {
@@ -48,6 +50,8 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
     link: <><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/></>,
     text: <><path d="M4 6h16M10 6v12M7 18h6"/></>,
     chef: <><path d="M6 11a4 4 0 0 1 1-7.8A5 5 0 0 1 16.8 4 4 0 0 1 18 11"/><path d="M6 11v9h12v-9M9 16h6"/></>,
+    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></>,
+    logout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></>,
     arrow: <><path d="M5 12h14M14 7l5 5-5 5"/></>,
   };
 
@@ -74,6 +78,44 @@ function NavItem({ icon, label, href, active = false }: { icon: IconName; label:
       </span>
       <span className="hidden lg:inline">{label}</span>
     </a>
+  );
+}
+
+function NavButton({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="group flex min-h-12 w-full items-center gap-3 px-3 text-sm font-bold text-[#736C64] transition hover:text-[#27231F]">
+      <span className="grid size-10 place-items-center rounded-full transition group-hover:bg-[#F2EDE5]">
+        <Icon name={icon} size={20} />
+      </span>
+      <span className="hidden lg:inline">{label}</span>
+    </button>
+  );
+}
+
+function FeaturedRecipeSkeleton() {
+  return (
+    <div className="grid min-h-[37rem] animate-pulse bg-[#E8E0D4] lg:min-h-96 lg:grid-cols-[1fr_1.05fr]" role="status" aria-label="A preparar o destaque">
+      <div className="flex flex-col justify-between p-7 sm:p-9 lg:p-11">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-[45%_55%_62%_38%/42%_44%_56%_58%] bg-[#F36F56] text-white">
+              <Icon name="chef" size={21} />
+            </span>
+            <span className="text-xs font-extrabold uppercase tracking-[.18em] text-[#746D64]">A preparar a mesa…</span>
+          </div>
+          <div className="mt-6 h-10 w-4/5 rounded-full bg-[#CEC3B5]" />
+          <div className="mt-3 h-10 w-3/5 rounded-full bg-[#CEC3B5]" />
+          <div className="mt-6 h-4 w-full max-w-md rounded-full bg-[#D8CFC3]" />
+          <div className="mt-2 h-4 w-4/5 max-w-sm rounded-full bg-[#D8CFC3]" />
+        </div>
+        <div className="mt-9 grid grid-cols-2 gap-3">
+          <div className="h-11 rounded-full bg-[#D4CABC]" />
+          <div className="h-11 rounded-full bg-[#D4CABC]" />
+        </div>
+      </div>
+      <div className="min-h-72 bg-[#D7CDC0] lg:rounded-l-[7rem]" />
+      <span className="sr-only">A carregar fotografia e cores da receita.</span>
+    </div>
   );
 }
 
@@ -125,6 +167,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   );
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [favouriteIds, setFavouriteIds] = useState(() => new Set(initialRecipes.filter((recipe) => recipe.isFavourite).map((recipe) => recipe.id)));
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -181,11 +224,31 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   }, [favouriteIds, initialRecipes, query, quickFilters, selectedTags]);
 
   const featured = initialRecipes.length > 0 ? initialRecipes[featuredIndex % initialRecipes.length] : null;
-  const featuredPanelColour = useAdaptiveRecipeColour(
+  const featuredPalette = useAdaptiveRecipeColour(
     featured?.coverUrl,
     featured?.id,
   );
+  const featuredPanelColour = featuredPalette.colour;
   const profileInitial = displayName.trim().charAt(0).toLocaleUpperCase("pt-PT") || "U";
+
+  useEffect(() => {
+    if (!profileOpen && !addOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setProfileOpen(false);
+      setAddOpen(false);
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [addOpen, profileOpen]);
+
+  async function signOut() {
+    await createClient().auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   async function toggleFavourite(recipeId: string) {
     const wasFavourite = favouriteIds.has(recipeId);
@@ -240,15 +303,15 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
           <NavItem icon="home" label="Início" active href="#topo" />
           <NavItem icon="book" label="Receitas" href="#receitas" />
           <NavItem icon="compass" label="Descobrir" href="#descobrir" />
-          <NavItem icon="more" label="Caixote" href="/caixote" />
+          <NavButton icon="more" label="Mais" onClick={() => setProfileOpen(true)} />
         </nav>
         <Link href="/receitas/nova" className="mt-7 flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5">
           <Icon name="plus" size={20} /><span className="hidden lg:inline">Nova receita</span>
         </Link>
-        <div className="mt-auto flex items-center gap-3 border-t border-[#E5DED4] px-2 pt-5">
+        <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} className="mt-auto flex min-h-16 w-full items-center gap-3 border-t border-[#E5DED4] px-2 pt-5 text-left transition hover:text-[#285240]">
           <span className="grid size-10 shrink-0 place-items-center rounded-[55%_45%_62%_38%/45%_55%_45%_55%] bg-[#F36F56] font-serif text-lg font-black text-white">{profileInitial}</span>
           <div className="hidden min-w-0 lg:block"><p className="truncate text-sm font-extrabold">{displayName}</p><p className="text-xs text-[#7B746B]">Perfil ativo</p></div>
-        </div>
+        </button>
       </aside>
 
       <main id="topo" className="pb-28 md:ml-24 md:pb-10 lg:ml-64">
@@ -276,21 +339,27 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
           {feedback ? <p role="status" className="mt-4 bg-[#FBE5DF] px-4 py-3 text-sm font-bold text-[#8B3F27]">{feedback}</p> : null}
 
-          <section id="descobrir" className="relative mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1] transition-colors duration-500" style={{ backgroundColor: featuredPanelColour }} aria-labelledby="destaque-title">
+          <section id="descobrir" className="relative mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1] transition-colors duration-500" style={{ backgroundColor: featuredPanelColour }} aria-labelledby="destaque-title" aria-busy={featured ? !featuredPalette.isReady : undefined}>
             <div className="absolute -top-20 right-[34%] size-44 rounded-full border-[24px] border-white/7" />
-            {featured ? (
-              <div className="grid lg:grid-cols-[1fr_1.05fr]">
+            {featured && !featuredPalette.isReady ? (
+              <FeaturedRecipeSkeleton />
+            ) : featured ? (
+              <div className="grid animate-[cookbook-reveal_.28s_ease-out] lg:grid-cols-[1fr_1.05fr]">
                 <div className="relative flex flex-col justify-between bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Para cozinhar hoje</p>
                     <h2 id="destaque-title" className="mt-4 max-w-xl font-serif text-4xl font-black leading-[1.05] tracking-[-.04em] sm:text-5xl">{featured.title}</h2>
                     <p className="mt-4 max-w-lg text-sm leading-6 text-white/72">{featured.description || "Uma receita da vossa coleção, pronta para voltar à mesa."}</p>
                   </div>
-                  <div className="mt-9 flex flex-wrap items-center gap-3">
-                    <span className="inline-flex items-center gap-2 text-sm font-bold"><Icon name="clock" size={18} />{formatMinutes(featured)}</span>
-                    {featured.difficulty ? <span className="border-l border-white/25 pl-3 text-sm font-bold">{difficultyLabels[featured.difficulty]}</span> : null}
-                    <Link href={`/receitas/${featured.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-extrabold text-[#285240]">Ver receita<Icon name="arrow" size={17} /></Link>
-                    <button type="button" onClick={() => setFeaturedIndex((current) => (current + 1) % initialRecipes.length)} className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F]"><Icon name="shuffle" size={18} />Outra</button>
+                  <div className="mt-9 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-2 text-sm font-bold"><Icon name="clock" size={18} />{formatMinutes(featured)}</span>
+                      {featured.difficulty ? <span className="border-l border-white/25 pl-3 text-sm font-bold">{difficultyLabels[featured.difficulty]}</span> : null}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:flex sm:max-w-sm">
+                      <Link href={`/receitas/${featured.id}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-extrabold text-[#285240] sm:flex-1">Ver receita<Icon name="arrow" size={17} /></Link>
+                      <button type="button" onClick={() => setFeaturedIndex((current) => (current + 1) % initialRecipes.length)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F] sm:flex-1"><Icon name="shuffle" size={18} />Outra</button>
+                    </div>
                   </div>
                 </div>
                 <div className="relative min-h-72 overflow-hidden lg:rounded-l-[7rem]">
@@ -357,9 +426,8 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
             )}
           </section>
 
-          <footer id="mais" className="mt-14 flex flex-col gap-3 border-t border-[#DDD5C9] py-7 text-sm text-[#746D64] sm:flex-row sm:items-center sm:justify-between">
+          <footer className="mt-14 border-t border-[#DDD5C9] py-7 text-sm text-[#746D64]">
             <p className="font-serif font-bold">Cookbook · feito para a nossa mesa.</p>
-            <div className="flex flex-wrap items-center gap-2"><Link href="/caixote" className="min-h-11 rounded-full px-4 py-3 font-extrabold text-[#285240] hover:bg-[#E5EBDD]">Abrir caixote</Link><button type="button" onClick={async () => { await createClient().auth.signOut(); router.push("/login"); router.refresh(); }} className="min-h-11 self-start rounded-full px-4 font-extrabold text-[#285240] hover:bg-[#E5EBDD] sm:self-auto">Terminar sessão</button></div>
           </footer>
         </div>
       </main>
@@ -369,8 +437,35 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
         <a href="#receitas" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="book" size={19} /><span>Receitas</span></a>
         <button type="button" onClick={() => setAddOpen(true)} className="mx-auto grid size-14 -translate-y-5 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_6px_0_#D94F38]" aria-label="Adicionar receita"><Icon name="plus" size={26} /></button>
         <a href="#descobrir" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="compass" size={19} /><span>Descobrir</span></a>
-        <Link href="/caixote" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="more" size={19} /><span>Mais</span></Link>
+        <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]"><Icon name="more" size={19} /><span>Mais</span></button>
       </nav>
+
+      {profileOpen ? (
+        <div className="fixed inset-0 z-50 bg-[#27231F]/24 backdrop-blur-[2px]" role="presentation" onMouseDown={() => setProfileOpen(false)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="profile-menu-title" onMouseDown={(event) => event.stopPropagation()} className="safe-bottom absolute inset-x-3 bottom-3 rounded-[2.2rem_2.2rem_3.5rem_2.2rem] bg-[#FFFCF6] p-6 text-[#27231F] shadow-2xl md:bottom-6 md:left-6 md:right-auto md:w-72 md:rounded-[2rem_2rem_3.2rem_2rem]">
+            <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#D4CCC0] md:hidden" />
+            <div className="flex items-center gap-3 border-b border-[#E5DED4] pb-5">
+              <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_62%_38%/45%_55%_45%_55%] bg-[#F36F56] font-serif text-xl font-black text-white">{profileInitial}</span>
+              <div className="min-w-0 flex-1">
+                <h2 id="profile-menu-title" className="truncate font-serif text-xl font-black">{displayName}</h2>
+                <p className="text-xs font-semibold text-[#7B746B]">Perfil ativo</p>
+              </div>
+              <button type="button" onClick={() => setProfileOpen(false)} className="grid size-10 place-items-center rounded-full bg-[#F1ECE4] text-xl" aria-label="Fechar menu">×</button>
+            </div>
+            <div className="mt-3 space-y-1">
+              <Link href="/caixote" onClick={() => setProfileOpen(false)} className="flex min-h-14 items-center gap-3 rounded-2xl px-3 font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
+                <span className="grid size-10 place-items-center rounded-[55%_45%_42%_58%] bg-[#E5EBDD]"><Icon name="trash" size={20} /></span>
+                <span className="flex-1">Abrir caixote</span>
+                <Icon name="arrow" size={17} />
+              </Link>
+              <button type="button" onClick={() => void signOut()} className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 text-left font-extrabold text-[#A74735] transition hover:bg-[#FBE0D8]">
+                <span className="grid size-10 place-items-center rounded-[48%_52%_60%_40%] bg-[#FBE0D8]"><Icon name="logout" size={20} /></span>
+                Terminar sessão
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {addOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#27231F]/38 p-3 backdrop-blur-[2px] sm:items-center" role="presentation" onMouseDown={() => setAddOpen(false)}>
@@ -389,12 +484,10 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                 <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#AFC9DA]/60 text-[#285240]"><Icon name="text" size={21} /></span>
                 <span className="min-w-0 flex-1"><strong className="block">Importar texto</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Colar, rever medidas e confirmar</span></span><Icon name="arrow" size={18} />
               </Link>
-              {[{ icon: "link" as const, title: "Importar ligação", description: "Website, TikTok ou Instagram" }].map((option) => (
-                <div key={option.title} className="flex min-h-20 items-center gap-4 border-b border-[#E6DED3] py-3 text-left opacity-55">
-                  <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#FBE0D8] text-[#E25B43]"><Icon name={option.icon} size={21} /></span>
-                  <span className="min-w-0 flex-1"><strong className="block">{option.title}</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">{option.description}</span></span><span className="text-[10px] font-extrabold uppercase tracking-wider">Em breve</span>
-                </div>
-              ))}
+              <Link href="/receitas/importar/url" className="flex min-h-20 items-center gap-4 border-b border-[#DED6CA] py-3 text-left transition hover:border-[#F36F56]">
+                <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#FBE0D8] text-[#E25B43]"><Icon name="link" size={21} /></span>
+                <span className="min-w-0 flex-1"><strong className="block">Importar ligação</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Website e links públicos, sempre com preview</span></span><Icon name="arrow" size={18} />
+              </Link>
             </div>
           </section>
         </div>

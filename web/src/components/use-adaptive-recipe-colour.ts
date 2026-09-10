@@ -16,6 +16,7 @@ export function useAdaptiveRecipeColour(
   const [sampledColour, setSampledColour] = useState<{
     key: string;
     colour: string;
+    isReady: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -38,12 +39,24 @@ export function useAdaptiveRecipeColour(
         setSampledColour({
           key: colourKey,
           colour: panelColourFromPixels(pixels, seed),
+          isReady: true,
         });
       } catch {
-        return;
+        setSampledColour({
+          key: colourKey,
+          colour: fallbackRecipeColour(seed),
+          isReady: true,
+        });
       }
     };
-    image.onerror = () => undefined;
+    image.onerror = () => {
+      if (cancelled) return;
+      setSampledColour({
+        key: colourKey,
+        colour: fallbackRecipeColour(seed),
+        isReady: true,
+      });
+    };
     image.src = imageUrl;
 
     return () => {
@@ -53,7 +66,14 @@ export function useAdaptiveRecipeColour(
     };
   }, [colourKey, imageUrl, seed]);
 
+  if (!imageUrl) {
+    return {
+      colour: fallbackRecipeColour(seed),
+      isReady: true,
+    };
+  }
+
   return sampledColour?.key === colourKey
-    ? sampledColour.colour
-    : fallbackRecipeColour(seed);
+    ? { colour: sampledColour.colour, isReady: sampledColour.isReady }
+    : { colour: fallbackRecipeColour(seed), isReady: false };
 }

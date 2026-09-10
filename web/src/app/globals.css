@@ -30,6 +30,11 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 ::selection { background: #f3c565; color: #27231f; }
 
+@keyframes cookbook-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

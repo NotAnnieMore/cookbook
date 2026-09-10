@@ -541,11 +541,10 @@ export async function createRecipe(
   const { data: importJob, error: importJobError } = importJobId
     ? await supabase
         .from("import_jobs")
-        .select("id,input_text,status,result_draft")
+        .select("id,input_type,input_text,source_url,status,result_draft")
         .eq("id", importJobId)
         .eq("household_id", membership.household_id)
         .eq("created_by", user.id)
-        .eq("input_type", "text")
         .eq("status", "preview")
         .maybeSingle()
     : { data: null, error: null };
@@ -553,7 +552,7 @@ export async function createRecipe(
   if (importJobId && (importJobError || !importJob)) {
     return {
       message:
-        "Este preview de importação já não está disponível. Volta a colar o texto.",
+        "Este preview de importação já não está disponível. Volta a iniciar a importação.",
     };
   }
 
@@ -569,8 +568,9 @@ export async function createRecipe(
       active_time_minutes: activeTime,
       total_time_minutes: totalTime,
       difficulty: result.data.difficulty || null,
-      origin_kind: importJob ? "text" : "manual",
-      origin_label: importJob ? "Texto colado" : null,
+      origin_kind: importJob?.input_type === "url" ? "url" : importJob ? "text" : "manual",
+      origin_label: importJob?.input_type === "url" ? "Website" : importJob ? "Texto colado" : null,
+      source_url: importJob?.input_type === "url" ? importJob.source_url : null,
     })
     .select("id")
     .single();
@@ -611,10 +611,11 @@ export async function createRecipe(
     importJob
       ? supabase.from("recipe_sources").insert({
           recipe_id: recipe.id,
-          source_type: "text",
+          source_type: importJob.input_type === "url" ? "url" : "text",
+          source_url: importJob.input_type === "url" ? importJob.source_url : null,
           source_title_original:
             draftTitle(importJob.result_draft) ?? result.data.title,
-          source_text_original: importJob.input_text,
+          source_text_original: importJob.input_type === "text" ? importJob.input_text : null,
           imported_by: user.id,
         })
       : Promise.resolve({ error: null }),

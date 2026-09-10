@@ -17,8 +17,9 @@ linguagem visual quente, editorial e assumidamente culinária.
 - intervalos de quantidade e tamanho real de latas/embalagens;
 - medidas europeias por defeito, conversões americanas e referências por ingrediente;
 - importação de texto com preservação da fonte e preview editável obrigatório;
+- importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
 - etiquetas e filtros combináveis;
-- painéis de destaque com paleta adaptativa derivada da fotografia;
+- painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
 - autoria visível e favoritos individuais;
 - pesquisa por receita, ingrediente, autor ou etiqueta, destaque aleatório e
   página completa de cada receita;
@@ -85,7 +86,7 @@ npm run build
 ## Próximas fases
 
 - substituição da fotografia principal e galeria;
-- importação por websites, TikTok e Instagram;
+- adaptadores dedicados para TikTok e Instagram;
 - extração estruturada com IA apenas como fallback;
 - modo cozinha com gestos, progresso e temporizadores;
 - backups exportáveis e recuperação testada.

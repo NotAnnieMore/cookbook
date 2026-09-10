@@ -31,7 +31,9 @@ A primeira fatia funcional está ligada à coleção partilhada na Supabase:
 - conversões de medidas americanas com preservação dos valores originais;
 - etiquetas partilhadas e filtros por favorito, duração, dificuldade e etiqueta;
 - importação de texto com parser determinístico, rate limit e preview obrigatório;
-- cartões de destaque com cor complementar escolhida a partir da fotografia;
+- importação por URL com proteção SSRF, limites de rede, Schema.org, fallback HTML e preview obrigatório;
+- cartões de destaque na coleção e no detalhe com cor complementar escolhida a partir da fotografia;
+- skeletons de navegação e de análise de imagem, sem flashes da paleta provisória;
 - leitura completa de cada receita;
 - favoritos individuais persistidos;
 - escolha aleatória;
@@ -47,7 +49,7 @@ O projeto Supabase está ligado e a primeira camada de autenticação está impl
 - schema com RLS, Realtime e Storage privado preparado no projeto remoto;
 - atualização em tempo real da coleção e dos favoritos entre Ivo e Ana.
 
-A próxima fase é a importação por website, TikTok e Instagram. A IA será usada
-como fallback quando a extração estruturada não for suficiente.
+A próxima fase são os adaptadores dedicados para TikTok e Instagram. A IA será
+usada como fallback quando a extração estruturada e o HTML não forem suficientes.
 
 O contexto completo encontra-se em `../Cookbook_Project_Context/`.
