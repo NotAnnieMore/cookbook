@@ -9,21 +9,18 @@ import type { RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/client";
 
 import AppDecorations from "./app-decorations";
-import { CookbookMascotLoader, CookbookMascotMark } from "./cookbook-mascot";
+import { CookbookMascotIllustration, CookbookMascotLoader, CookbookMascotMark } from "./cookbook-mascot";
 import { useAdaptiveRecipeColour } from "./use-adaptive-recipe-colour";
 
 type IconName =
   | "home"
   | "book"
-  | "compass"
   | "more"
   | "plus"
   | "search"
   | "heart"
   | "clock"
   | "shuffle"
-  | "link"
-  | "text"
   | "trash"
   | "logout"
   | "arrow";
@@ -42,15 +39,12 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
     home: <><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></>,
     book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h6"/></>,
-    compass: <><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></>,
     more: <><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></>,
     plus: <><path d="M12 5v14M5 12h14"/></>,
     search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
     heart: <path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.4 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/>,
     clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
     shuffle: <><path d="M3 7h3c4 0 5 10 9 10h6"/><path d="m18 14 3 3-3 3"/><path d="M3 17h3c1.4 0 2.4-1.2 3.3-2.8M14.4 7.8C15.6 7.2 17 7 18 7h3"/><path d="m18 4 3 3-3 3"/></>,
-    link: <><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/></>,
-    text: <><path d="M4 6h16M10 6v12M7 18h6"/></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></>,
     logout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></>,
     arrow: <><path d="M5 12h14M14 7l5 5-5 5"/></>,
@@ -161,11 +155,14 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     () => new Set(),
   );
   const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [featuredChanging, setFeaturedChanging] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<HomeSection>("topo");
   const navigationLockRef = useRef<{ section: HomeSection; until: number } | null>(null);
+  const featuredTimersRef = useRef<number[]>([]);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const [favouriteIds, setFavouriteIds] = useState(() => new Set(initialRecipes.filter((recipe) => recipe.isFavourite).map((recipe) => recipe.id)));
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -268,9 +265,28 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     };
   }, []);
 
+  useEffect(() => () => {
+    featuredTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
   function navigateToSection(section: HomeSection) {
     navigationLockRef.current = { section, until: Date.now() + 1_000 };
     setActiveSection(section);
+  }
+
+  function changeFeatured(direction = 1) {
+    if (initialRecipes.length < 2 || featuredChanging) return;
+    setFeaturedChanging(true);
+    featuredTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    featuredTimersRef.current = [
+      window.setTimeout(() => {
+        setFeaturedIndex((current) => (current + direction + initialRecipes.length) % initialRecipes.length);
+      }, 280),
+      window.setTimeout(() => {
+        setFeaturedChanging(false);
+        featuredTimersRef.current = [];
+      }, 850),
+    ];
   }
 
   async function signOut() {
@@ -331,8 +347,8 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
         </a>
         <nav aria-label="Navegação principal" className="space-y-1">
           <NavItem icon="home" label="Início" active={!profileOpen && activeSection === "topo"} href="#topo" onClick={() => navigateToSection("topo")} />
+          <NavItem icon="shuffle" label="Para hoje" active={!profileOpen && activeSection === "descobrir"} href="#descobrir" onClick={() => navigateToSection("descobrir")} />
           <NavItem icon="book" label="Receitas" active={!profileOpen && activeSection === "receitas"} href="#receitas" onClick={() => navigateToSection("receitas")} />
-          <NavItem icon="compass" label="Descobrir" active={!profileOpen && activeSection === "descobrir"} href="#descobrir" onClick={() => navigateToSection("descobrir")} />
           <NavButton icon="more" label="Mais" active={profileOpen} onClick={() => setProfileOpen(true)} />
         </nav>
         <button type="button" onClick={() => setAddOpen(true)} className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5" aria-label="Adicionar ou importar receita">
@@ -376,8 +392,30 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
           {feedback ? <p role="status" className="mt-4 bg-[#FBE5DF] px-4 py-3 text-sm font-bold text-[#8B3F27]">{feedback}</p> : null}
 
-          <section id="descobrir" className="relative mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1] transition-colors duration-500" style={{ backgroundColor: featuredPanelColour }} aria-labelledby="destaque-title" aria-busy={featured ? !featuredPalette.isReady : undefined}>
+          <section
+            id="descobrir"
+            className="relative mt-9 touch-pan-y overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1] transition-colors duration-500"
+            style={{ backgroundColor: featuredPanelColour }}
+            aria-labelledby="destaque-title"
+            aria-busy={featured ? !featuredPalette.isReady || featuredChanging : undefined}
+            onTouchStart={(event) => {
+              const touch = event.touches[0];
+              if (touch) swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+            }}
+            onTouchEnd={(event) => {
+              const start = swipeStartRef.current;
+              const touch = event.changedTouches[0];
+              swipeStartRef.current = null;
+              if (!start || !touch) return;
+              const horizontal = touch.clientX - start.x;
+              const vertical = touch.clientY - start.y;
+              if (Math.abs(horizontal) >= 48 && Math.abs(horizontal) > Math.abs(vertical) * 1.25) changeFeatured(horizontal < 0 ? 1 : -1);
+            }}
+          >
             <div className="absolute -top-20 right-[34%] size-44 rounded-full border-[24px] border-white/7" />
+            <div className={`pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[#FFF8E7]/94 text-[#285240] backdrop-blur-sm transition-all duration-300 ${featuredChanging ? "visible opacity-100" : "invisible opacity-0"}`} aria-hidden={!featuredChanging}>
+              <div className="text-center"><CookbookMascotLoader label="A escolher outra receita…" className="size-28 sm:size-36" /><p className="mt-1 text-xs font-extrabold uppercase tracking-[.18em]">A escolher outra receita…</p></div>
+            </div>
             {featured && !featuredPalette.isReady ? (
               <FeaturedRecipeSkeleton />
             ) : featured ? (
@@ -395,7 +433,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:flex sm:max-w-sm">
                       <Link href={`/receitas/${featured.id}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-extrabold text-[#285240] sm:flex-1">Ver receita<Icon name="arrow" size={17} /></Link>
-                      <button type="button" onClick={() => setFeaturedIndex((current) => (current + 1) % initialRecipes.length)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F] sm:flex-1"><Icon name="shuffle" size={18} />Outra</button>
+                      <button type="button" onClick={() => changeFeatured(1)} disabled={featuredChanging || initialRecipes.length < 2} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F] sm:flex-1 disabled:opacity-60" title="Também podes deslizar a fotografia"><Icon name="shuffle" size={18} />Outra</button>
                     </div>
                   </div>
                 </div>
@@ -471,9 +509,9 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
       <nav aria-label="Navegação principal" className="safe-bottom fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-[2rem] border border-[#DDD5C9] bg-[#FFFCF6]/96 px-2 py-2 shadow-[0_14px_40px_rgba(53,44,35,.16)] backdrop-blur md:hidden">
         <a href="#topo" onClick={() => navigateToSection("topo")} aria-current={!profileOpen && activeSection === "topo" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold ${!profileOpen && activeSection === "topo" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "topo" ? "rounded-[55%_45%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="home" size={18} /></span><span>Início</span></a>
-        <a href="#receitas" onClick={() => navigateToSection("receitas")} aria-current={!profileOpen && activeSection === "receitas" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "receitas" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "receitas" ? "rounded-[48%_52%_38%_62%] bg-[#E5EBDD]" : ""}`}><Icon name="book" size={19} /></span><span>Receitas</span></a>
+        <a href="#descobrir" onClick={() => navigateToSection("descobrir")} aria-current={!profileOpen && activeSection === "descobrir" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "descobrir" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "descobrir" ? "rounded-[52%_48%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="shuffle" size={18} /></span><span>Hoje</span></a>
         <button type="button" onClick={() => setAddOpen(true)} aria-expanded={addOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold text-[#E25B43]" aria-label="Adicionar receita"><span className="grid size-9 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_3px_0_#D94F38]"><Icon name="plus" size={21} /></span><span>Adicionar</span></button>
-        <a href="#descobrir" onClick={() => navigateToSection("descobrir")} aria-current={!profileOpen && activeSection === "descobrir" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "descobrir" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "descobrir" ? "rounded-[52%_48%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="compass" size={19} /></span><span>Descobrir</span></a>
+        <a href="#receitas" onClick={() => navigateToSection("receitas")} aria-current={!profileOpen && activeSection === "receitas" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "receitas" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "receitas" ? "rounded-[48%_52%_38%_62%] bg-[#E5EBDD]" : ""}`}><Icon name="book" size={19} /></span><span>Receitas</span></a>
         <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} aria-current={profileOpen ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${profileOpen ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${profileOpen ? "rounded-[55%_45%_42%_58%] bg-[#E5EBDD]" : ""}`}><Icon name="more" size={19} /></span><span>Mais</span></button>
       </nav>
 
@@ -518,11 +556,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                 <span className="min-w-0 flex-1"><strong className="block">Criar manualmente</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Título, tempos, ingredientes e passos</span></span><Icon name="arrow" size={18} />
               </Link>
               <Link href="/receitas/importar/texto" className="flex min-h-20 items-center gap-4 border-b border-[#DED6CA] py-3 text-left transition hover:border-[#F36F56]">
-                <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#AFC9DA]/60 text-[#285240]"><Icon name="text" size={21} /></span>
+                <CookbookMascotIllustration variant="reading" className="size-12 shrink-0" />
                 <span className="min-w-0 flex-1"><strong className="block">Importar texto</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Colar, rever medidas e confirmar</span></span><Icon name="arrow" size={18} />
               </Link>
               <Link href="/receitas/importar/url" className="flex min-h-20 items-center gap-4 border-b border-[#DED6CA] py-3 text-left transition hover:border-[#F36F56]">
-                <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_42%_58%] bg-[#FBE0D8] text-[#E25B43]"><Icon name="link" size={21} /></span>
+                <CookbookMascotIllustration variant="exploring" className="size-12 shrink-0" />
                 <span className="min-w-0 flex-1"><strong className="block">Importar ligação</strong><span className="mt-1 block text-xs leading-5 text-[#746D64]">Website e links públicos, sempre com preview</span></span><Icon name="arrow" size={18} />
               </Link>
             </div>

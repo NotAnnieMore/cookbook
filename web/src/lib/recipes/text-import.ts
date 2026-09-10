@@ -286,6 +286,75 @@ function looksLikeSubheading(line: string) {
   );
 }
 
+function hasListMarker(line: string) {
+  return /^\s*(?:[-*•▪◦]|\d+[.)])\s+/.test(line);
+}
+
+function looksLikeInstruction(line: string) {
+  const value = stripListMarker(line);
+  if (/^\s*\d+[.)]\s+/.test(line)) return true;
+  if (/^(?:misturar|misture|mexer|mexa|adicionar|adicione|acrescentar|acrescente|juntar|junte|bater|bata|levar|leve|colocar|coloque|cozer|coza|cozinhar|cozinhe|assar|asse|aquecer|aqueça|triturar|triture|derreter|derreta|envolver|envolva|servir|sirva|reservar|reserve|deixar|deixe|cortar|corte|lavar|lave|temperar|tempere|preparar|prepare|espalhar|espalhe|verter|verta|tapar|tape|refrigerar|refrigere|mix|stir|add|combine|whisk|beat|place|pour|bake|cook|heat|blend|serve|chill|refrigerate)(?=\s|$|[,.:;])/iu.test(value)) return true;
+  return value.length >= 32 && /[.!?]$/.test(value);
+}
+
+function looksLikeIngredient(line: string) {
+  const value = stripListMarker(line);
+  if (!value || looksLikeSubheading(line)) return false;
+  if (/^\s*\d+[.)]\s+/.test(line)) return false;
+  if (quantityPrefix.test(value)) return true;
+  if (/^(?:q\.?\s*b\.?|quanto baste|a gosto|to taste)\b/i.test(value)) return true;
+  return hasListMarker(line) && !looksLikeInstruction(line) && value.split(/\s+/).length <= 12;
+}
+
+function inferMissingSections(input: string) {
+  const lines = input.replace(/\r\n?/g, "\n").split("\n").map((line) => line.trim()).filter(Boolean);
+  const ingredientHeadingIndex = lines.findIndex((line) => sectionHeading(line) === "ingredients");
+  const stepHeadingIndex = lines.findIndex((line) => sectionHeading(line) === "steps");
+  if (ingredientHeadingIndex >= 0 && stepHeadingIndex >= 0) return { lines, inferred: false };
+
+  let ingredientStart = ingredientHeadingIndex;
+  if (ingredientStart < 0) {
+    ingredientStart = lines.findIndex((line, index) => index > 0 && looksLikeIngredient(line));
+    if (ingredientStart < 0 && looksLikeIngredient(lines[0] ?? "")) ingredientStart = 0;
+    if (ingredientStart > 0 && looksLikeSubheading(lines[ingredientStart - 1])) ingredientStart -= 1;
+  }
+
+  let stepStart = stepHeadingIndex;
+  if (stepStart < 0 && ingredientStart >= 0) {
+    let ingredientsSeen = 0;
+    const searchFrom = ingredientHeadingIndex >= 0 ? ingredientHeadingIndex + 1 : ingredientStart;
+    for (let index = searchFrom; index < lines.length; index += 1) {
+      if (looksLikeSubheading(lines[index])) continue;
+      if (looksLikeIngredient(lines[index])) {
+        ingredientsSeen += 1;
+        continue;
+      }
+      if (ingredientsSeen > 0 && looksLikeInstruction(lines[index])) {
+        stepStart = index;
+        break;
+      }
+    }
+  }
+
+  if (ingredientStart < 0 || stepStart < 0 || stepStart <= ingredientStart) return { lines, inferred: false };
+
+  const inferredLines: string[] = [];
+  if (ingredientStart === 0) inferredLines.push("Receita importada");
+  lines.forEach((line, index) => {
+    if (ingredientHeadingIndex < 0 && index === ingredientStart) inferredLines.push("Ingredientes");
+    if (stepHeadingIndex < 0 && index === stepStart) inferredLines.push("Preparação");
+    inferredLines.push(line);
+  });
+  return { lines: inferredLines, inferred: true };
+}
+
+function preparationInstructions(line: string) {
+  return stripListMarker(line)
+    .split(/(?<=[.!?])\s+(?=(?:\d+[.)]\s*)?[\p{L}\d])/u)
+    .map((part) => stripListMarker(part))
+    .filter(Boolean);
+}
+
 export function parseRecipeText(input: string): TextImportResult {
   const draft: TextImportDraft = {
     title: "",
@@ -299,12 +368,16 @@ export function parseRecipeText(input: string): TextImportResult {
     steps: [],
   };
   const warnings = new Set<string>();
+  const inferredInput = inferMissingSections(input);
+  if (inferredInput.inferred) {
+    warnings.add("Separámos automaticamente a lista de ingredientes da preparação. Confirma a divisão no preview.");
+  }
   const descriptionLines: string[] = [];
   let section: ImportSection = "intro";
   let ingredientGroup = "";
   let stepSection = "";
 
-  for (const rawLine of input.replace(/\r\n?/g, "\n").split("\n")) {
+  for (const rawLine of inferredInput.lines) {
     const line = rawLine.trim();
     if (!line) continue;
 
@@ -337,8 +410,9 @@ export function parseRecipeText(input: string): TextImportResult {
       continue;
     }
 
-    const instruction = stripListMarker(line);
-    if (instruction) draft.steps.push({ instruction, section: stepSection });
+    for (const instruction of preparationInstructions(line)) {
+      draft.steps.push({ instruction, section: stepSection });
+    }
   }
 
   draft.description = descriptionLines.join(" ").slice(0, 1200);

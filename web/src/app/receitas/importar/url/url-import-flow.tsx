@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import RecipeForm from "@/app/receitas/nova/recipe-form";
+import { CookbookMascotIllustration } from "@/components/cookbook-mascot";
 
 import { analyseRecipeUrl, type UrlImportState } from "./actions";
 
@@ -44,8 +45,10 @@ export default function UrlImportFlow({ displayName }: { displayName: string }) 
   return (
     <section className="mx-auto max-w-5xl px-5 pb-24 sm:px-8">
       <form action={action} className="rounded-[2rem_2rem_4.5rem_2rem] bg-[#FFFCF6] p-6 shadow-[0_10px_0_#E6DED2] sm:p-8">
-        <label htmlFor="source-url" className="font-serif text-2xl font-black">Link da receita</label>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#746D64]">Funciona melhor em páginas públicas de receitas. Também tentamos ler descrições públicas de redes sociais, mas alguns serviços podem bloquear o acesso automático.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div><label htmlFor="source-url" className="font-serif text-2xl font-black">Link da receita</label><p className="mt-2 max-w-2xl text-sm leading-6 text-[#746D64]">Funciona melhor em páginas públicas de receitas. Também tentamos ler descrições públicas de redes sociais, mas alguns serviços podem bloquear o acesso automático.</p></div>
+          <CookbookMascotIllustration variant="exploring" animated={pending} priority className="size-20 shrink-0 sm:size-28" />
+        </div>
         <input id="source-url" name="source_url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" required maxLength={2048} defaultValue={state.sourceUrl} className="mt-5 min-h-14 w-full rounded-2xl border-2 border-[#D8D0C4] bg-[#F8F4EC] px-5 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#999187] focus:border-[#285240] focus:ring-4 focus:ring-[#285240]/10" placeholder="https://exemplo.com/receita" />
         <details className="mt-4 rounded-2xl bg-[#F8F4EC] px-4 py-3 text-sm text-[#6F6860]">
           <summary className="cursor-pointer font-extrabold text-[#285240]">O que conseguimos ler</summary>
@@ -60,6 +63,7 @@ export default function UrlImportFlow({ displayName }: { displayName: string }) 
             <textarea id="source-text-override" name="source_text_override" required minLength={20} maxLength={30000} className="mt-4 min-h-64 w-full resize-y rounded-2xl border border-[#D8C58E] bg-[#FFFCF6] p-4 text-base leading-7 outline-none focus:border-[#285240] focus:ring-4 focus:ring-[#285240]/10" placeholder={`Honey Glazed Bacon Wrapped Garlic Chicken Bites\n\nIngredients:\n* Garlic chicken bites\n* Bacon\n* Honey\n\nInstructions:\n1. Prepare…`} />
           </div>
         ) : null}
+        {pending ? <p role="status" className="mt-5 text-center text-sm font-extrabold text-[#285240] sm:text-right">A mascote está a seguir a ligação e a procurar a receita…</p> : null}
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/receitas/importar/texto" className="inline-flex min-h-12 items-center justify-center rounded-full px-5 text-sm font-extrabold text-[#285240] hover:bg-[#E5EBDD]">Prefiro colar o texto</Link>
           <button type="submit" disabled={pending} className="min-h-14 rounded-full bg-[#F36F56] px-7 text-base font-extrabold text-white shadow-[0_6px_0_#D94F38] disabled:cursor-wait disabled:opacity-60">{pending ? "A analisar…" : state.needsSourceText ? "Analisar texto e criar preview" : "Criar preview"}</button>

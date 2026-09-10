@@ -1,5 +1,13 @@
 import Image from "next/image";
 
+export type CookbookMascotVariant = "full" | "reading" | "exploring";
+
+const mascotSources: Record<CookbookMascotVariant, string> = {
+  full: "/brand/cookbook-mascot-full.png",
+  reading: "/brand/cookbook-mascot-reading.png",
+  exploring: "/brand/cookbook-mascot-exploring.png",
+};
+
 export function CookbookMascotMark({ className = "size-11", title }: { className?: string; title?: string }) {
   return (
     <svg
@@ -20,18 +28,24 @@ export function CookbookMascotMark({ className = "size-11", title }: { className
   );
 }
 
-export function CookbookMascotLoader({ label = "A preparar a mesa…", className = "size-36" }: { label?: string; className?: string }) {
+export function CookbookMascotIllustration({ variant = "full", className = "size-36", animated = false, priority = false }: { variant?: CookbookMascotVariant; className?: string; animated?: boolean; priority?: boolean }) {
+  return (
+    <Image
+      src={mascotSources[variant]}
+      width={800}
+      height={800}
+      sizes="160px"
+      alt=""
+      priority={priority}
+      className={`${animated ? "cookbook-mascot-loading" : ""} object-contain ${className}`}
+    />
+  );
+}
+
+export function CookbookMascotLoader({ label = "A preparar a mesa…", className = "size-36", variant = "full" }: { label?: string; className?: string; variant?: CookbookMascotVariant }) {
   return (
     <div className="grid place-items-center">
-      <Image
-        src="/brand/cookbook-mascot-full.png"
-        width={800}
-        height={800}
-        sizes="160px"
-        alt=""
-        priority
-        className={`cookbook-mascot-loading object-contain ${className}`}
-      />
+      <CookbookMascotIllustration variant={variant} className={className} animated priority />
       <span className="sr-only">{label}</span>
     </div>
   );

@@ -37,10 +37,27 @@ Recheio:
   assert.equal(result.draft?.steps[1].section, "Recheio");
 });
 
-test("asks for explicit section headings when structure is unclear", () => {
+test("infers ingredients and preparation without explicit headings", () => {
   const result = parseRecipeText("Bolo simples\n2 ovos\nMisturar tudo");
-  assert.equal(result.draft, null);
-  assert.match(result.error ?? "", /Ingredientes/);
+  assert.equal(result.error, null);
+  assert.equal(result.draft?.ingredients[0].name, "ovos");
+  assert.equal(result.draft?.steps[0].instruction, "Misturar tudo");
+  assert.match(result.warnings.join(" "), /automaticamente/);
+});
+
+test("splits an unformatted preparation paragraph into individual steps", () => {
+  const result = parseRecipeText(`Cheesecake simples
+- 400 g de bolacha
+- 110 g de manteiga
+Triturar a bolacha. Misturar com a manteiga. Pressionar na forma e levar ao frigorífico.`);
+
+  assert.equal(result.error, null);
+  assert.equal(result.draft?.ingredients.length, 2);
+  assert.deepEqual(result.draft?.steps.map((step) => step.instruction), [
+    "Triturar a bolacha.",
+    "Misturar com a manteiga.",
+    "Pressionar na forma e levar ao frigorífico.",
+  ]);
 });
 
 test("keeps unquantified ingredients and flags them for review", () => {
