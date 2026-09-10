@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AppDecorations from "@/components/app-decorations";
+import StickyPageHeader from "@/components/sticky-page-header";
 import { createClient } from "@/lib/supabase/server";
 
 import RestoreButton from "./restore-button";
@@ -34,14 +35,11 @@ export default async function TrashPage() {
   const recipes = recipesResult.data ?? [];
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#F8F4EC] pb-20 text-[#27231F]">
-      <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-[46%_54%_61%_39%/57%_41%_59%_43%] bg-[#F2A58B]/45" />
-      <header className="relative mx-auto max-w-5xl px-5 pb-10 pt-6 sm:px-8 sm:pt-9">
-        <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
-          <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6" /></svg>
-          Voltar à coleção
-        </Link>
-        <p className="mt-9 text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Nada se perde por engano</p>
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] pb-20 text-[#27231F]">
+      <AppDecorations tone="warm" />
+      <StickyPageHeader />
+      <header className="relative z-10 mx-auto max-w-5xl px-5 pb-10 pt-8 sm:px-8 sm:pt-10">
+        <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Nada se perde por engano</p>
         <h1 className="mt-2 font-serif text-5xl font-black leading-[.98] tracking-[-.05em] sm:text-6xl">Caixote</h1>
         <p className="mt-5 max-w-2xl leading-7 text-[#716A62]">As receitas removidas ficam aqui até decidirem o que fazer. Nesta fase não existe eliminação automática nem definitiva.</p>
       </header>

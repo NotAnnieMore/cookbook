@@ -1,3 +1,5 @@
+import AppDecorations from "./app-decorations";
+
 function ChefMark() {
   return (
     <span className="grid size-11 place-items-center rounded-[45%_55%_62%_38%/42%_44%_56%_58%] bg-[#F36F56] text-white shadow-[0_5px_0_#D94F38]">
@@ -11,15 +13,16 @@ function ChefMark() {
 
 export default function HomeLoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-[#F8F4EC] text-[#27231F]" role="status" aria-label="A carregar o Cookbook">
-      <aside className="fixed inset-y-0 left-0 hidden w-24 border-r border-[#DDD5C9] bg-[#FFFCF6] px-3 py-6 md:block lg:w-64 lg:px-6">
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] text-[#27231F]" role="status" aria-label="A carregar o Cookbook">
+      <AppDecorations tone="mixed" />
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-24 border-r border-[#DDD5C9] bg-[#FFFCF6] px-3 py-6 md:block lg:w-64 lg:px-6">
         <div className="flex items-center gap-3 px-2"><ChefMark /><span className="hidden font-serif text-[1.7rem] font-black text-[#285240] lg:inline">Cookbook</span></div>
         <div className="mt-10 space-y-4 px-2">
           {["w-3/4", "w-2/3", "w-4/5", "w-1/2"].map((width) => <div key={width} className={`h-10 ${width} animate-pulse rounded-full bg-[#E8E1D7]`} />)}
         </div>
       </aside>
 
-      <main className="pb-28 md:ml-24 md:pb-10 lg:ml-64">
+      <main className="relative z-10 pb-28 md:ml-24 md:pb-10 lg:ml-64">
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
           <div className="flex items-center justify-between">
             <div>
@@ -34,7 +37,7 @@ export default function HomeLoadingSkeleton() {
           </div>
 
           <section className="mt-9 overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] bg-[#E8E0D4] shadow-[0_16px_0_#E4DDD1]">
-            <div className="grid grid-rows-[25rem_18rem] animate-pulse sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
+            <div className="grid grid-rows-[22rem_15rem] animate-pulse sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
               <div className="flex min-h-0 flex-col justify-between overflow-hidden p-7 sm:p-9 lg:p-11">
                 <div>
                   <div className="flex items-center gap-3"><ChefMark /><span className="text-xs font-extrabold uppercase tracking-[.18em] text-[#746D64]">A preparar a mesa…</span></div>

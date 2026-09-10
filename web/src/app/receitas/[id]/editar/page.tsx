@@ -1,10 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 
-import RecipeForm, {
-  BackToCollection,
-  type RecipeFormValues,
-} from "@/app/receitas/nova/recipe-form";
+import RecipeForm, { type RecipeFormValues } from "@/app/receitas/nova/recipe-form";
 import { updateRecipe } from "@/app/receitas/nova/actions";
+import AppDecorations from "@/components/app-decorations";
+import StickyPageHeader from "@/components/sticky-page-header";
 import { createClient } from "@/lib/supabase/server";
 
 function displayNumber(value: number | string | null) {
@@ -116,24 +115,26 @@ export default async function EditRecipePage({
   const updateAction = updateRecipe.bind(null, recipe.id, recipe.version);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#F8F4EC] text-[#27231F]">
-      <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-[46%_54%_61%_39%/57%_41%_59%_43%] bg-[#AFC9DA]/55" />
-      <header className="relative mx-auto max-w-5xl px-5 pb-9 pt-6 sm:px-8 sm:pt-9">
-        <BackToCollection href={`/receitas/${recipe.id}`} label="Voltar à receita" />
-        <div className="mt-8 max-w-3xl">
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] text-[#27231F]">
+      <AppDecorations tone="blue" />
+      <StickyPageHeader href={`/receitas/${recipe.id}`} label="Voltar à receita" />
+      <header className="relative z-10 mx-auto max-w-5xl px-5 pb-9 pt-8 sm:px-8 sm:pt-10">
+        <div className="max-w-3xl">
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Afinar a receita</p>
           <h1 className="mt-2 font-serif text-5xl font-black leading-[.98] tracking-[-.05em] sm:text-6xl">Editar sem perder a história</h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-[#716A62]">Se Ivo ou Ana tiverem alterado esta receita entretanto, a versão mais recente não será substituída sem aviso.</p>
         </div>
       </header>
-      <RecipeForm
-        displayName={displayName}
-        action={updateAction}
-        mode="edit"
-        initialValues={initialValues}
-        recipeId={recipe.id}
-        expectedVersion={recipe.version}
-      />
+      <div className="relative z-10">
+        <RecipeForm
+          displayName={displayName}
+          action={updateAction}
+          mode="edit"
+          initialValues={initialValues}
+          recipeId={recipe.id}
+          expectedVersion={recipe.version}
+        />
+      </div>
     </main>
   );
 }

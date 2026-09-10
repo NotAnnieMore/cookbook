@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import AppDecorations from "@/components/app-decorations";
+import StickyPageHeader from "@/components/sticky-page-header";
 import { createClient } from "@/lib/supabase/server";
 
 import FavouriteButton from "./favourite-button";
@@ -96,16 +97,13 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   const sourceUrl = externalSourceUrl(recipe.source_url);
 
   return (
-    <main className="min-h-screen bg-[#F8F4EC] pb-20 text-[#27231F]">
-      <header className="sticky top-0 z-40 mx-auto flex max-w-6xl items-center justify-between border-b border-[#DDD5C9]/75 bg-[#F8F4EC]/92 px-5 py-3 backdrop-blur-md sm:px-8">
-        <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
-          <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6" /></svg>
-          Voltar à coleção
-        </Link>
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] pb-20 text-[#27231F]">
+      <AppDecorations tone="mixed" />
+      <StickyPageHeader maxWidth="max-w-6xl">
         <FavouriteButton recipeId={recipe.id} userId={user.id} initialFavourite={Boolean(favouriteResult.data)} />
-      </header>
+      </StickyPageHeader>
 
-      <article className="mx-auto max-w-6xl px-5 sm:px-8">
+      <article className="relative z-10 mx-auto max-w-6xl px-5 pt-5 sm:px-8 sm:pt-7">
         {aviso === "fotografia" ? <p role="status" className="mb-5 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">A receita foi atualizada, mas não foi possível guardar a fotografia.</p> : null}
         <RecipeHero
           recipeId={recipe.id}

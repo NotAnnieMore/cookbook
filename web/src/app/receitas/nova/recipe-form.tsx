@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import ImageCropper from "@/components/image-cropper";
@@ -93,10 +92,6 @@ function preparationPhasesFrom(values: RecipeFormValues | undefined) {
     phase.steps.push({ id: 2000 + index, instruction: step.instruction });
   });
   return phases;
-}
-
-function ArrowLeft() {
-  return <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
 }
 
 function Plus() {
@@ -328,8 +323,4 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
       {cropSource ? <ImageCropper sourceUrl={cropSource.url} fileName={cropSource.fileName} onCancel={() => closeCropper()} onApply={applyCroppedCover} /> : null}
     </form>
   );
-}
-
-export function BackToCollection({ href = "/", label = "Voltar à coleção" }: { href?: string; label?: string }) {
-  return <Link href={href} className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]"><ArrowLeft />{label}</Link>;
 }

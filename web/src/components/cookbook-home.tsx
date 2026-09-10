@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/client";
 
+import AppDecorations from "./app-decorations";
 import { useAdaptiveRecipeColour } from "./use-adaptive-recipe-colour";
 
 type IconName =
@@ -95,7 +96,7 @@ function NavButton({ icon, label, onClick, active = false }: { icon: IconName; l
 
 function FeaturedRecipeSkeleton() {
   return (
-    <div className="grid grid-rows-[25rem_18rem] animate-pulse bg-[#E8E0D4] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none" role="status" aria-label="A preparar o destaque">
+    <div className="grid grid-rows-[22rem_15rem] animate-pulse bg-[#E8E0D4] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none" role="status" aria-label="A preparar o destaque">
       <div className="flex min-h-0 flex-col justify-between overflow-hidden p-7 sm:p-9 lg:p-11">
         <div>
           <div className="flex items-center gap-3">
@@ -171,6 +172,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   const [profileOpen, setProfileOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<HomeSection>("topo");
+  const navigationLockRef = useRef<{ section: HomeSection; until: number } | null>(null);
   const [favouriteIds, setFavouriteIds] = useState(() => new Set(initialRecipes.filter((recipe) => recipe.isFavourite).map((recipe) => recipe.id)));
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -249,6 +251,12 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
   useEffect(() => {
     function updateActiveSection() {
+      const lock = navigationLockRef.current;
+      if (lock && Date.now() < lock.until) {
+        setActiveSection(lock.section);
+        return;
+      }
+      navigationLockRef.current = null;
       const marker = window.scrollY + Math.min(window.innerHeight * 0.28, 220);
       const discoverTop = document.getElementById("descobrir")?.offsetTop ?? Number.POSITIVE_INFINITY;
       const recipesTop = document.getElementById("receitas")?.offsetTop ?? Number.POSITIVE_INFINITY;
@@ -266,6 +274,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       window.removeEventListener("resize", updateActiveSection);
     };
   }, []);
+
+  function navigateToSection(section: HomeSection) {
+    navigationLockRef.current = { section, until: Date.now() + 1_000 };
+    setActiveSection(section);
+  }
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -316,16 +329,17 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   const hasActiveFilters = quickFilters.size > 0 || selectedTags.size > 0;
 
   return (
-    <div className="min-h-screen bg-[#F8F4EC] text-[#27231F]">
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#F8F4EC] text-[#27231F]">
+      <AppDecorations tone="mixed" />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col border-r border-[#DDD5C9] bg-[#FFFCF6] px-3 py-6 md:flex lg:w-64 lg:px-6">
         <a href="#topo" className="mb-9 flex items-center gap-3 px-2 text-[#285240]">
           <BrandMark />
           <span className="hidden font-serif text-[1.7rem] font-black tracking-[-.04em] lg:inline">Cookbook</span>
         </a>
         <nav aria-label="Navegação principal" className="space-y-1">
-          <NavItem icon="home" label="Início" active={!profileOpen && activeSection === "topo"} href="#topo" onClick={() => setActiveSection("topo")} />
-          <NavItem icon="book" label="Receitas" active={!profileOpen && activeSection === "receitas"} href="#receitas" onClick={() => setActiveSection("receitas")} />
-          <NavItem icon="compass" label="Descobrir" active={!profileOpen && activeSection === "descobrir"} href="#descobrir" onClick={() => setActiveSection("descobrir")} />
+          <NavItem icon="home" label="Início" active={!profileOpen && activeSection === "topo"} href="#topo" onClick={() => navigateToSection("topo")} />
+          <NavItem icon="book" label="Receitas" active={!profileOpen && activeSection === "receitas"} href="#receitas" onClick={() => navigateToSection("receitas")} />
+          <NavItem icon="compass" label="Descobrir" active={!profileOpen && activeSection === "descobrir"} href="#descobrir" onClick={() => navigateToSection("descobrir")} />
           <NavButton icon="more" label="Mais" active={profileOpen} onClick={() => setProfileOpen(true)} />
         </nav>
         <button type="button" onClick={() => setAddOpen(true)} className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5" aria-label="Adicionar ou importar receita">
@@ -337,7 +351,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
         </button>
       </aside>
 
-      <main id="topo" className="pb-28 md:ml-24 md:pb-10 lg:ml-64">
+      <main id="topo" className="relative z-10 pb-28 md:ml-24 md:pb-10 lg:ml-64">
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
           <header>
             <div>
@@ -374,7 +388,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
             {featured && !featuredPalette.isReady ? (
               <FeaturedRecipeSkeleton />
             ) : featured ? (
-              <div className="grid grid-rows-[25rem_18rem] animate-[cookbook-reveal_.28s_ease-out] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
+              <div className="grid grid-rows-[22rem_15rem] animate-[cookbook-reveal_.28s_ease-out] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
                 <div className="relative flex min-h-0 flex-col justify-start overflow-hidden bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Para cozinhar hoje</p>
@@ -463,10 +477,10 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       </main>
 
       <nav aria-label="Navegação principal" className="safe-bottom fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-[2rem] border border-[#DDD5C9] bg-[#FFFCF6]/96 px-2 py-2 shadow-[0_14px_40px_rgba(53,44,35,.16)] backdrop-blur md:hidden">
-        <a href="#topo" onClick={() => setActiveSection("topo")} aria-current={!profileOpen && activeSection === "topo" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold ${!profileOpen && activeSection === "topo" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "topo" ? "rounded-[55%_45%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="home" size={18} /></span><span>Início</span></a>
-        <a href="#receitas" onClick={() => setActiveSection("receitas")} aria-current={!profileOpen && activeSection === "receitas" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "receitas" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "receitas" ? "rounded-[48%_52%_38%_62%] bg-[#E5EBDD]" : ""}`}><Icon name="book" size={19} /></span><span>Receitas</span></a>
+        <a href="#topo" onClick={() => navigateToSection("topo")} aria-current={!profileOpen && activeSection === "topo" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold ${!profileOpen && activeSection === "topo" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "topo" ? "rounded-[55%_45%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="home" size={18} /></span><span>Início</span></a>
+        <a href="#receitas" onClick={() => navigateToSection("receitas")} aria-current={!profileOpen && activeSection === "receitas" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "receitas" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "receitas" ? "rounded-[48%_52%_38%_62%] bg-[#E5EBDD]" : ""}`}><Icon name="book" size={19} /></span><span>Receitas</span></a>
         <button type="button" onClick={() => setAddOpen(true)} aria-expanded={addOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold text-[#E25B43]" aria-label="Adicionar receita"><span className="grid size-9 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_3px_0_#D94F38]"><Icon name="plus" size={21} /></span><span>Adicionar</span></button>
-        <a href="#descobrir" onClick={() => setActiveSection("descobrir")} aria-current={!profileOpen && activeSection === "descobrir" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "descobrir" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "descobrir" ? "rounded-[52%_48%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="compass" size={19} /></span><span>Descobrir</span></a>
+        <a href="#descobrir" onClick={() => navigateToSection("descobrir")} aria-current={!profileOpen && activeSection === "descobrir" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "descobrir" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "descobrir" ? "rounded-[52%_48%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="compass" size={19} /></span><span>Descobrir</span></a>
         <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} aria-current={profileOpen ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${profileOpen ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${profileOpen ? "rounded-[55%_45%_42%_58%] bg-[#E5EBDD]" : ""}`}><Icon name="more" size={19} /></span><span>Mais</span></button>
       </nav>
 
