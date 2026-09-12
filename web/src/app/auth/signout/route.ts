@@ -15,7 +15,11 @@ export async function POST(request: NextRequest) {
   if (directHost) allowedOrigins.add(`${requestUrl.protocol}//${directHost}`);
   const fetchSite = request.headers.get("sec-fetch-site");
 
-  if (fetchSite === "cross-site" || (origin && !allowedOrigins.has(origin))) {
+  const browserConfirmedSameOrigin = fetchSite === "same-origin";
+  if (
+    fetchSite === "cross-site"
+    || (!browserConfirmedSameOrigin && origin && !allowedOrigins.has(origin))
+  ) {
     return NextResponse.json({ message: "Pedido inválido." }, { status: 403 });
   }
 
