@@ -27,7 +27,7 @@ export default function PwaInstallAction() {
     window.matchMedia("(display-mode: standalone)").matches
     || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
   );
-  const isInstalled = !browserReady || installedByEvent || detectedStandalone;
+  const isInstalled = installedByEvent || detectedStandalone;
 
   useEffect(() => {
     function rememberPrompt(event: Event) {
@@ -48,7 +48,18 @@ export default function PwaInstallAction() {
     };
   }, []);
 
-  if (isInstalled || (!promptEvent && !isIos)) return null;
+  if (!browserReady) return null;
+
+  if (isInstalled) {
+    return (
+      <div className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 font-extrabold text-[#285240]" title="A app está instalada e abre sem a barra do navegador">
+        <span className="grid size-10 place-items-center rounded-[48%_52%_60%_40%] bg-[#E5EBDD]" aria-hidden>✓</span>
+        <span className="flex-1">Cookbook instalado</span>
+      </div>
+    );
+  }
+
+  if (!promptEvent && !isIos) return null;
 
   async function install() {
     if (!promptEvent) {

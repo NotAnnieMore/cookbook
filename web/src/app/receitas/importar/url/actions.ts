@@ -150,19 +150,55 @@ export async function analyseRecipeUrl(
     sourceKind = "tiktok";
   }
 
-  const { data: job, error: jobError } = await supabase
+  const jobId = crypto.randomUUID();
+  const jobPayload = {
+    id: jobId,
+    household_id: membership.household_id,
+    created_by: user.id,
+    input_type: "url",
+    source_url: normalizedUrl.toString(),
+    input_text: sourceText?.success ? sourceText.data : null,
+    status: "fetching",
+  } as const;
+  const firstJobResult = await supabase
     .from("import_jobs")
-    .insert({
-      household_id: membership.household_id,
-      created_by: user.id,
-      input_type: "url",
-      source_url: normalizedUrl.toString(),
-      input_text: sourceText?.success ? sourceText.data : null,
-      status: "fetching",
-    })
+    .insert(jobPayload)
     .select("id")
     .single();
-  if (jobError || !job) return { message: "Não foi possível registar esta importação." };
+
+  let job = firstJobResult.data;
+  let jobError = firstJobResult.error;
+
+  if (jobError || !job) {
+    console.warn("A primeira tentativa de registar a importação falhou", {
+      code: jobError?.code,
+    });
+    const existingJob = await supabase
+      .from("import_jobs")
+      .select("id")
+      .eq("id", jobId)
+      .eq("created_by", user.id)
+      .maybeSingle();
+    if (existingJob.data) {
+      job = existingJob.data;
+      jobError = null;
+    } else {
+      const retryJobResult = await supabase
+        .from("import_jobs")
+        .insert(jobPayload)
+        .select("id")
+        .single();
+      job = retryJobResult.data;
+      jobError = retryJobResult.error;
+    }
+  }
+
+  if (jobError || !job) {
+    console.error("Não foi possível registar a importação após nova tentativa", {
+      code: jobError?.code,
+    });
+    return { message: "Não foi possível registar esta importação. Confirma a ligação e tenta novamente." };
+  }
 
   let sourceUrl = socialUrl ?? normalizedUrl.toString();
   let result: UrlImportResult | null = null;

@@ -481,11 +481,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
         </nav>
         <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} className="mt-auto flex min-h-16 w-full items-center gap-3 border-t border-[#E5DED4] px-2 pt-5 text-left transition hover:text-[#285240]">
           <span className="grid size-10 shrink-0 place-items-center rounded-[55%_45%_62%_38%/45%_55%_45%_55%] bg-[#F36F56] font-serif text-lg font-black text-white">{profileInitial}</span>
-          <div className="hidden min-w-0 lg:block"><p className="truncate text-sm font-extrabold">{displayName}</p><p className="text-xs text-[#7B746B]">Perfil ativo</p></div>
+          <div className="hidden min-w-0 lg:block"><p className="truncate text-sm font-extrabold">{displayName}</p><p className="text-xs text-[#7B746B]">Ajudante do Chef Pitéu</p></div>
         </button>
       </aside>
 
-      <main id="topo" className="relative z-10 pb-28 md:ml-24 md:pb-10 lg:ml-64">
+      <main id="topo" className="safe-top relative z-10 pb-28 md:ml-24 md:pb-10 lg:ml-64">
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
           <header>
             <div>
@@ -662,7 +662,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
               <span className="grid size-12 shrink-0 place-items-center rounded-[55%_45%_62%_38%/45%_55%_45%_55%] bg-[#F36F56] font-serif text-xl font-black text-white">{profileInitial}</span>
               <div className="min-w-0 flex-1">
                 <h2 id="profile-menu-title" className="truncate font-serif text-xl font-black">{displayName}</h2>
-                <p className="text-xs font-semibold text-[#7B746B]">Perfil ativo</p>
+                <p className="text-xs font-semibold text-[#7B746B]">Ajudante do Chef Pitéu</p>
               </div>
               <button type="button" onClick={() => setProfileOpen(false)} className="grid size-10 place-items-center rounded-full bg-[#F1ECE4] text-xl" aria-label="Fechar menu">×</button>
             </div>

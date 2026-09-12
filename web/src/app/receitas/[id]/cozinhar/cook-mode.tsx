@@ -6,7 +6,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import AppDecorations from "@/components/app-decorations";
 import CookModeLoading from "@/components/cook-mode-loading";
 import { CookbookMascotIllustration, CookbookMascotMark } from "@/components/cookbook-mascot";
-import { pauseCookTimer, resetCookTimer, restoreCookTimer, startCookTimer, tickCookTimers, type CookTimer, type SavedCookTimer } from "@/lib/recipes/cook-timers";
+import { adjustCookTimer, pauseCookTimer, resetCookTimer, restoreCookTimer, startCookTimer, tickCookTimers, type CookTimer, type SavedCookTimer } from "@/lib/recipes/cook-timers";
 
 type Ingredient = {
   id: string;
@@ -83,9 +83,42 @@ function timerDurationLabel(seconds: number) {
   return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
 }
 
+async function showTimerNotification(recipeId: string, recipeTitle: string, stepIndex: number, stepId: string) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const options: NotificationOptions = {
+    body: `Passo ${stepIndex + 1} de ${recipeTitle}`,
+    icon: "/icons/cookbook-192.png",
+    badge: "/icons/cookbook-192.png",
+    tag: `cookbook-timer-${recipeId}-${stepId}`,
+    data: { url: `/receitas/${recipeId}/cozinhar` },
+  };
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification("Cookbook · tempo terminado", options);
+      return;
+    }
+  } catch {
+    // Em computadores sem um service worker ativo ainda tentamos a notificação normal.
+  }
+
+  try {
+    new Notification("Cookbook · tempo terminado", options);
+  } catch {
+    // O aviso dentro da app e a vibração continuam disponíveis.
+  }
+}
+
 function initialTimers(steps: Step[], saved: Record<string, SavedCookTimer> = {}): Record<string, CookTimer> {
   return Object.fromEntries(steps.flatMap((step) => step.timerSeconds
-    ? [[step.id, restoreCookTimer(step.timerSeconds, saved[step.id])] as const]
+    ? [[step.id, restoreCookTimer(
+        typeof saved[step.id]?.durationSeconds === "number" && (saved[step.id]?.durationSeconds ?? 0) >= 60
+          ? Math.round(saved[step.id]?.durationSeconds ?? step.timerSeconds)
+          : step.timerSeconds,
+        saved[step.id],
+      )] as const]
     : []));
 }
 
@@ -190,16 +223,11 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
       const latest = completed.at(-1);
       if (!latest) return;
       setTimerMessage(`O temporizador do passo ${latest.index + 1} terminou.`);
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Cookbook · tempo terminado", {
-          body: `Passo ${latest.index + 1} de ${recipe.title}`,
-          icon: "/brand/cookbook-mascot-mark.svg",
-        });
-      }
+      void showTimerNotification(recipe.id, recipe.title, latest.index, latest.step.id);
       navigator.vibrate?.([180, 100, 180]);
     }, 0);
     return () => window.clearTimeout(notificationTimer);
-  }, [activeTimers, hydrated, recipe.title]);
+  }, [activeTimers, hydrated, recipe.id, recipe.title]);
 
   useEffect(() => {
     if (!ingredientsOpen) return;
@@ -315,6 +343,14 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
     });
   }
 
+  function adjustTimer(stepId: string, deltaSeconds: number) {
+    setTimerMessage(null);
+    setTimers((current) => {
+      const timer = current[stepId];
+      return timer ? { ...current, [stepId]: adjustCookTimer(timer, deltaSeconds) } : current;
+    });
+  }
+
   function stopAllTimers() {
     setTimerMessage(null);
     setTimers((current) => Object.fromEntries(
@@ -372,7 +408,7 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
 
   if (!started) {
     return (
-      <main className="relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] px-5 py-6 text-[#27231F] sm:px-8">
+      <main className="safe-top-page relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] px-5 py-6 text-[#27231F] sm:px-8">
         <AppDecorations tone="mixed" />
         <div className="relative z-10 mx-auto max-w-4xl">
           <Link href={`/receitas/${recipe.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] hover:bg-[#E5EBDD]">← Voltar à receita</Link>
@@ -403,7 +439,7 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
 
   return (
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-[#F8F4EC] text-[#27231F]">
-      <header className="shrink-0 border-b border-[#DDD5C9] bg-[#FFFCF6]/95 px-4 py-2 backdrop-blur sm:px-7 sm:py-3">
+      <header className="safe-top shrink-0 border-b border-[#DDD5C9] bg-[#FFFCF6]/95 px-4 py-2 backdrop-blur sm:px-7 sm:py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <Link href={`/receitas/${recipe.id}`} className="grid size-11 shrink-0 place-items-center rounded-full text-xl font-black text-[#285240] hover:bg-[#E5EBDD]" aria-label="Sair do modo cozinhar">×</Link>
           <div className="min-w-0 text-center"><p className="truncate font-serif text-lg font-black">{recipe.title}</p><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#746D64]">Passo {currentIndex + 1} de {recipe.steps.length}</p></div>
@@ -487,20 +523,27 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
             {currentTimer ? (
               <div className="mt-8 rounded-[1.5rem_1.5rem_2.8rem_1.5rem] border-t-4 border-[#F3C565] bg-[#FFF7DF] p-4 sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-5">
                 <div className="flex items-end justify-between gap-4 sm:block">
-                  <div><p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#A94B37]">Temporizador deste passo</p><p className="mt-1 text-sm font-bold text-[#746D64]">{timerDurationLabel(currentTimer.durationSeconds)}</p></div>
+                  <div>
+                    <p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#A94B37]">Temporizador deste passo</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button type="button" onClick={() => adjustTimer(currentStep.id, -60)} className="grid size-9 place-items-center rounded-full border border-[#D8C58E] bg-[#FFFCF6] text-lg font-black text-[#285240]" aria-label="Retirar um minuto ao temporizador">−</button>
+                      <span className="min-w-14 text-center text-xs font-extrabold text-[#746D64]">{timerDurationLabel(currentTimer.durationSeconds)}</span>
+                      <button type="button" onClick={() => adjustTimer(currentStep.id, 60)} className="grid size-9 place-items-center rounded-full border border-[#D8C58E] bg-[#FFFCF6] text-lg font-black text-[#285240]" aria-label="Adicionar um minuto ao temporizador">+</button>
+                    </div>
+                  </div>
                   <span className={`font-serif text-4xl font-black tabular-nums ${currentTimer.status === "done" ? "text-[#E25B43]" : "text-[#285240]"}`}>{formatTimer(currentTimer.remainingSeconds)}</span>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2 sm:mt-0 sm:justify-end">
-                  <button type="button" onClick={() => toggleTimer(currentStep.id)} className="min-h-12 flex-1 rounded-full bg-[#F3C565] px-5 text-sm font-extrabold text-[#27231F] shadow-[0_3px_0_#D7A93D] sm:flex-none">
+                <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:mt-0 sm:flex sm:justify-end">
+                  <button type="button" onClick={() => toggleTimer(currentStep.id)} className="min-h-12 min-w-0 rounded-full bg-[#F3C565] px-4 text-xs font-extrabold leading-4 text-[#27231F] shadow-[0_3px_0_#D7A93D] sm:px-5">
                     {currentTimer.status === "running"
                       ? "Pausar"
                       : currentTimer.status === "paused"
                         ? "Retomar"
                         : currentTimer.status === "done"
-                          ? `Temporizar novamente ${timerDurationLabel(currentTimer.durationSeconds)}`
-                          : `Temporizar ${timerDurationLabel(currentTimer.durationSeconds)}`}
+                          ? `Repetir ${timerDurationLabel(currentTimer.durationSeconds)}`
+                          : `Iniciar ${timerDurationLabel(currentTimer.durationSeconds)}`}
                   </button>
-                  {currentTimer.status !== "idle" ? <button type="button" onClick={() => resetTimer(currentStep.id)} className="min-h-12 rounded-full px-4 text-sm font-extrabold text-[#285240]">{currentTimer.status === "done" ? "Repor" : "Parar e repor"}</button> : null}
+                  {currentTimer.status !== "idle" ? <button type="button" onClick={() => resetTimer(currentStep.id)} className="min-h-12 rounded-full px-3 text-xs font-extrabold text-[#285240] sm:px-4 sm:text-sm">{currentTimer.status === "done" ? "Repor" : "Parar"}</button> : null}
                 </div>
               </div>
             ) : null}

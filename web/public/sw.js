@@ -1,4 +1,4 @@
-const CACHE_NAME = "cookbook-static-v1";
+const CACHE_NAME = "cookbook-static-v2";
 const ESSENTIAL_ASSETS = [
   "/icon.svg",
   "/icons/cookbook-192.png",
@@ -45,5 +45,23 @@ self.addEventListener("fetch", (event) => {
       }
       return response;
     })),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || "/cozinhar", self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+      const existing = windows.find((client) => client.url === targetUrl);
+      if (existing) return existing.focus();
+      const visible = windows.find((client) => "focus" in client);
+      if (visible) {
+        await visible.navigate(targetUrl);
+        return visible.focus();
+      }
+      return self.clients.openWindow(targetUrl);
+    }),
   );
 });

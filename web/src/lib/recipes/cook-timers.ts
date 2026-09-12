@@ -52,6 +52,36 @@ export function resetCookTimer(timer: CookTimer): CookTimer {
   return createCookTimer(timer.durationSeconds);
 }
 
+export function adjustCookTimer(timer: CookTimer, deltaSeconds: number, now = Date.now()): CookTimer {
+  if (!Number.isFinite(deltaSeconds) || deltaSeconds === 0) return timer;
+
+  const durationSeconds = Math.max(60, Math.round(timer.durationSeconds + deltaSeconds));
+  const currentRemaining = remainingCookTimerSeconds(timer, now);
+  const remainingSeconds = timer.status === "idle"
+    ? durationSeconds
+    : Math.min(durationSeconds, Math.max(0, currentRemaining + deltaSeconds));
+
+  if (timer.status === "running") {
+    return {
+      ...timer,
+      durationSeconds,
+      remainingSeconds,
+      endsAt: remainingSeconds > 0 ? now + remainingSeconds * 1000 : null,
+      status: remainingSeconds > 0 ? "running" : "done",
+      notified: false,
+    };
+  }
+
+  return {
+    ...timer,
+    durationSeconds,
+    remainingSeconds,
+    endsAt: null,
+    status: remainingSeconds === 0 ? "done" : timer.status === "done" ? "paused" : timer.status,
+    notified: remainingSeconds === 0 ? timer.notified : false,
+  };
+}
+
 export function tickCookTimers(timers: Record<string, CookTimer>, now = Date.now()) {
   let changed = false;
   const next = Object.fromEntries(Object.entries(timers).map(([stepId, timer]) => {

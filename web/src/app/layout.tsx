@@ -37,12 +37,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: "/icons/cookbook-192.png",
+    apple: "/icons/cookbook-192.png?v=2",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#285240",
+  themeColor: "#F8F4EC",
+  colorScheme: "light",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

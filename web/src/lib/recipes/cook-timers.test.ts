@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createCookTimer, pauseCookTimer, resetCookTimer, restoreCookTimer, startCookTimer, tickCookTimers } from "./cook-timers.ts";
+import { adjustCookTimer, createCookTimer, pauseCookTimer, resetCookTimer, restoreCookTimer, startCookTimer, tickCookTimers } from "./cook-timers.ts";
 
 test("uses a deadline so a timer remains accurate after background throttling", () => {
   const started = startCookTimer(createCookTimer(600), 1_000);
@@ -38,4 +38,23 @@ test("stops and fully resets a timer for the next cooking session", () => {
   assert.equal(reset.remainingSeconds, 120);
   assert.equal(reset.endsAt, null);
   assert.equal(reset.notified, false);
+});
+
+test("adds or removes one minute while keeping an active timer accurate", () => {
+  const running = startCookTimer(createCookTimer(600), 1_000);
+  const extended = adjustCookTimer(running, 60, 121_000);
+  assert.equal(extended.durationSeconds, 660);
+  assert.equal(extended.remainingSeconds, 540);
+  assert.equal(extended.endsAt, 661_000);
+
+  const shortened = adjustCookTimer(extended, -60, 181_000);
+  assert.equal(shortened.durationSeconds, 600);
+  assert.equal(shortened.remainingSeconds, 420);
+  assert.equal(shortened.endsAt, 601_000);
+});
+
+test("never reduces a timer below one minute", () => {
+  const timer = adjustCookTimer(createCookTimer(60), -60);
+  assert.equal(timer.durationSeconds, 60);
+  assert.equal(timer.remainingSeconds, 60);
 });
