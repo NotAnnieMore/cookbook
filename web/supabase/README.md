@@ -17,4 +17,17 @@ substituição de fotografias, executar também
 `setup/02_shared_image_replacement.sql`. Este ajuste permite que Ivo ou Ana
 substituam uma fotografia da coleção, mesmo quando foi o outro membro a enviá-la.
 
+Num projeto Cookbook já existente, executar também
+`setup/03_step_ingredients.sql`. Esta migração permite associar vários
+ingredientes a cada passo sem alterar as receitas guardadas anteriormente.
+
+Executar depois `setup/04_security_hardening.sql`. O script não altera receitas:
+retira privilégios ao papel anónimo, volta a confirmar RLS em todas as tabelas e
+garante que o bucket de fotografias permanece privado. As consultas finais devem
+mostrar `rowsecurity = true` em todas as linhas e `public = false` no bucket.
+
+A página **Mais → Segurança dos dados** permite descarregar uma cópia JSON dos
+dados visíveis à conta autenticada, incluindo as fotografias em base64. O ficheiro
+é privado e deve ser guardado fora do repositório.
+
 Nunca colocar a secret key/service-role no browser nem em variáveis `NEXT_PUBLIC_*`.

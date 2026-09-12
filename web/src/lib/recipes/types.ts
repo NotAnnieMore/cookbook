@@ -16,6 +16,7 @@ export type RecipeSummary = {
   difficulty: RecipeDifficulty;
   createdByName: string;
   isFavourite: boolean;
+  coverPath: string | null;
   coverUrl: string | null;
   updatedAt: string;
   ingredientNames: string[];

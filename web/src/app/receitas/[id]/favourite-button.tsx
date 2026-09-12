@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { CookbookMascotFavouriteReaction } from "@/components/cookbook-mascot";
 import { createClient } from "@/lib/supabase/client";
 
 export default function FavouriteButton({
@@ -15,6 +16,12 @@ export default function FavouriteButton({
 }) {
   const [favourite, setFavourite] = useState(initialFavourite);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showReaction, setShowReaction] = useState(false);
+  const reactionTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+  }, []);
 
   async function toggle() {
     const previous = favourite;
@@ -35,11 +42,18 @@ export default function FavouriteButton({
     if (error) {
       setFavourite(previous);
       setFeedback("Não foi possível atualizar o favorito.");
+      return;
+    }
+
+    if (!previous) {
+      if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+      setShowReaction(true);
+      reactionTimerRef.current = window.setTimeout(() => setShowReaction(false), 1_650);
     }
   }
 
   return (
-    <div>
+    <div className="relative inline-block">
       <button
         type="button"
         onClick={() => void toggle()}
@@ -51,6 +65,7 @@ export default function FavouriteButton({
         </svg>
         {favourite ? "Nos meus favoritos" : "Guardar nos favoritos"}
       </button>
+      {showReaction ? <CookbookMascotFavouriteReaction className="absolute bottom-[calc(100%+.75rem)] right-0 z-30 w-28" /> : null}
       {feedback ? <p role="alert" className="mt-2 text-xs font-bold text-[#9A402F]">{feedback}</p> : null}
     </div>
   );

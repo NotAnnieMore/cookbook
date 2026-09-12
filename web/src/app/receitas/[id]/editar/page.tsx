@@ -4,6 +4,7 @@ import RecipeForm, { type RecipeFormValues } from "@/app/receitas/nova/recipe-fo
 import { updateRecipe } from "@/app/receitas/nova/actions";
 import AppDecorations from "@/components/app-decorations";
 import StickyPageHeader from "@/components/sticky-page-header";
+import { canonicalIngredientUnit } from "@/lib/recipes/measurements";
 import { createClient } from "@/lib/supabase/server";
 
 function displayNumber(value: number | string | null) {
@@ -35,7 +36,7 @@ export default async function EditRecipePage({
   const [recipeResult, profileResult] = await Promise.all([
     supabase
       .from("recipes")
-      .select("id,title,description,servings,active_time_minutes,total_time_minutes,difficulty,version,ingredient_groups(id,name),recipe_sections(id,name),recipe_ingredients(group_id,ingredient_name,optional,quantity_original,quantity_max_original,unit_original,display_text_original,quantity_normalized,quantity_max_normalized,unit_normalized,package_quantity,package_unit,conversion_confidence,conversion_source,conversion_rule_version,sort_order),recipe_steps(section_id,instruction,sort_order),recipe_images(storage_path,image_kind),recipe_tags(tags(name))")
+      .select("id,title,description,servings,active_time_minutes,total_time_minutes,difficulty,version,ingredient_groups(id,name),recipe_sections(id,name),recipe_ingredients(id,group_id,ingredient_name,optional,quantity_original,quantity_max_original,unit_original,display_text_original,quantity_normalized,quantity_max_normalized,unit_normalized,package_quantity,package_unit,conversion_confidence,conversion_source,conversion_rule_version,sort_order),recipe_steps(id,section_id,instruction,timer_seconds,sort_order),recipe_images(storage_path,image_kind),recipe_tags(tags(name))")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -54,6 +55,18 @@ export default async function EditRecipePage({
   const steps = [...(recipe.recipe_steps ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order,
   );
+  const { data: stepIngredientLinks } = steps.length
+    ? await supabase
+        .from("recipe_step_ingredients")
+        .select("step_id,ingredient_id,sort_order")
+        .in("step_id", steps.map((step) => step.id))
+    : { data: [] };
+  const ingredientIdsByStep = new Map<string, string[]>();
+  for (const link of [...(stepIngredientLinks ?? [])].sort((a, b) => a.sort_order - b.sort_order)) {
+    const values = ingredientIdsByStep.get(link.step_id) ?? [];
+    values.push(link.ingredient_id);
+    ingredientIdsByStep.set(link.step_id, values);
+  }
   const images = Array.isArray(recipe.recipe_images) ? recipe.recipe_images : [];
   const ingredientGroups = new Map(
     (recipe.ingredient_groups ?? []).map((group) => [group.id, group.name]),
@@ -85,10 +98,11 @@ export default async function EditRecipePage({
     }),
     coverUrl: signedCover?.signedUrl ?? null,
     ingredients: ingredients.map((ingredient) => ({
+      sourceId: ingredient.id,
       name: ingredient.ingredient_name,
       quantity: displayNumber(ingredient.quantity_normalized),
       quantityMax: displayNumber(ingredient.quantity_max_normalized),
-      unit: ingredient.unit_normalized ?? "",
+      unit: canonicalIngredientUnit(ingredient.unit_normalized),
       optional: ingredient.optional,
       group: ingredient.group_id
         ? ingredientGroups.get(ingredient.group_id) ?? ""
@@ -105,9 +119,11 @@ export default async function EditRecipePage({
     })),
     steps: steps.map((step) => ({
       instruction: step.instruction,
+      timerSeconds: step.timer_seconds,
       section: step.section_id
         ? stepSections.get(step.section_id) ?? ""
         : "",
+      ingredientSourceIds: ingredientIdsByStep.get(step.id) ?? [],
     })),
   };
   const displayName =

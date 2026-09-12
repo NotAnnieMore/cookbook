@@ -115,6 +115,14 @@ create table public.recipe_steps (
   updated_at timestamptz not null default now()
 );
 
+create table public.recipe_step_ingredients (
+  step_id uuid not null references public.recipe_steps (id) on delete cascade,
+  ingredient_id uuid not null references public.recipe_ingredients (id) on delete cascade,
+  sort_order integer not null default 0 check (sort_order >= 0),
+  created_at timestamptz not null default now(),
+  primary key (step_id, ingredient_id)
+);
+
 create table public.tags (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null references public.households (id) on delete cascade,
@@ -193,6 +201,7 @@ create table public.recipe_images (
 create index recipes_household_updated_idx on public.recipes (household_id, deleted_at, updated_at desc);
 create index recipe_ingredients_order_idx on public.recipe_ingredients (recipe_id, sort_order);
 create index recipe_steps_order_idx on public.recipe_steps (recipe_id, sort_order);
+create index recipe_step_ingredients_ingredient_idx on public.recipe_step_ingredients (ingredient_id);
 create index recipe_favorites_user_idx on public.recipe_favorites (user_id, created_at desc);
 create index import_jobs_household_created_idx on public.import_jobs (household_id, created_at desc);
 
@@ -312,6 +321,7 @@ alter table public.ingredient_groups enable row level security;
 alter table public.recipe_ingredients enable row level security;
 alter table public.recipe_sections enable row level security;
 alter table public.recipe_steps enable row level security;
+alter table public.recipe_step_ingredients enable row level security;
 alter table public.tags enable row level security;
 alter table public.recipe_tags enable row level security;
 alter table public.recipe_favorites enable row level security;
@@ -335,6 +345,28 @@ create policy "ingredient_groups_member" on public.ingredient_groups for all to 
 create policy "ingredients_member" on public.recipe_ingredients for all to authenticated using (public.can_access_recipe(recipe_id)) with check (public.can_access_recipe(recipe_id));
 create policy "sections_member" on public.recipe_sections for all to authenticated using (public.can_access_recipe(recipe_id)) with check (public.can_access_recipe(recipe_id));
 create policy "steps_member" on public.recipe_steps for all to authenticated using (public.can_access_recipe(recipe_id)) with check (public.can_access_recipe(recipe_id));
+create policy "step_ingredients_member" on public.recipe_step_ingredients
+for all to authenticated
+using (
+  exists (
+    select 1
+    from public.recipe_steps step
+    join public.recipe_ingredients ingredient on ingredient.recipe_id = step.recipe_id
+    where step.id = step_id
+      and ingredient.id = ingredient_id
+      and public.can_access_recipe(step.recipe_id)
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.recipe_steps step
+    join public.recipe_ingredients ingredient on ingredient.recipe_id = step.recipe_id
+    where step.id = step_id
+      and ingredient.id = ingredient_id
+      and public.can_access_recipe(step.recipe_id)
+  )
+);
 create policy "tags_member" on public.tags for all to authenticated using (public.is_household_member(household_id)) with check (public.is_household_member(household_id));
 create policy "recipe_tags_member" on public.recipe_tags for all to authenticated using (public.can_access_recipe(recipe_id)) with check (public.can_access_recipe(recipe_id));
 
@@ -370,6 +402,7 @@ grant select, insert, update, delete on public.ingredient_groups to authenticate
 grant select, insert, update, delete on public.recipe_ingredients to authenticated;
 grant select, insert, update, delete on public.recipe_sections to authenticated;
 grant select, insert, update, delete on public.recipe_steps to authenticated;
+grant select, insert, update, delete on public.recipe_step_ingredients to authenticated;
 grant select, insert, update, delete on public.tags to authenticated;
 grant select, insert, update, delete on public.recipe_tags to authenticated;
 grant select, insert, delete on public.recipe_favorites to authenticated;
@@ -383,6 +416,7 @@ alter publication supabase_realtime add table public.ingredient_groups;
 alter publication supabase_realtime add table public.recipe_ingredients;
 alter publication supabase_realtime add table public.recipe_sections;
 alter publication supabase_realtime add table public.recipe_steps;
+alter publication supabase_realtime add table public.recipe_step_ingredients;
 alter publication supabase_realtime add table public.recipe_tags;
 alter publication supabase_realtime add table public.recipe_favorites;
 alter publication supabase_realtime add table public.ratings;

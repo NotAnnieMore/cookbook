@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import sharp from "sharp";
 import { z } from "zod";
 
+import { comparableQuantityRange, parseQuantityValue } from "@/lib/recipes/measurements";
+import { buildStepIngredientRows } from "@/lib/recipes/step-ingredients";
 import { createClient } from "@/lib/supabase/server";
 
 const quantitySchema = z
@@ -12,12 +14,13 @@ const quantitySchema = z
     .trim()
     .max(24)
     .refine(
-      (value) => !value || /^\d+(?:[.,]\d{1,4})?$/.test(value),
-      "Usa uma quantidade numérica, por exemplo 250 ou 1,5.",
+      (value) => !value || parseQuantityValue(value) !== null,
+      "Usa uma quantidade como 250, 1,5 ou 1/2.",
     );
 
 const ingredientSchema = z
   .object({
+    clientId: z.number().int().nonnegative().max(1_000_000_000),
     name: z.string().trim().min(1).max(200),
     quantity: quantitySchema,
     quantityMax: quantitySchema,
@@ -37,30 +40,23 @@ const ingredientSchema = z
     conversionRuleVersion: z.string().trim().max(40).optional(),
   })
   .refine(
-    ({ quantity, quantityMax }) =>
-      !quantityMax ||
-      (!!quantity &&
-        Number(quantityMax.replace(",", ".")) >=
-          Number(quantity.replace(",", "."))),
+    ({ quantity, quantityMax }) => {
+      if (!quantityMax) return true;
+      const quantityValue = parseQuantityValue(quantity);
+      const quantityMaxValue = parseQuantityValue(quantityMax);
+      return quantityValue !== null && quantityMaxValue !== null && quantityMaxValue >= quantityValue;
+    },
     {
       message:
         "A quantidade máxima deve ser igual ou superior à quantidade inicial.",
-    },
-  )
-  .refine(
-    ({ originalQuantity, originalQuantityMax }) =>
-      !originalQuantityMax ||
-      (!!originalQuantity &&
-        Number(originalQuantityMax.replace(",", ".")) >=
-          Number(originalQuantity.replace(",", "."))),
-    {
-      message: "O intervalo original da importação é inválido.",
     },
   );
 
 const stepSchema = z.object({
   instruction: z.string().trim().min(1).max(4000),
   section: z.string().trim().max(80),
+  ingredientClientIds: z.array(z.number().int().nonnegative().max(1_000_000_000)).max(100),
+  timerSeconds: z.number().int().positive().max(7 * 24 * 60 * 60).nullable(),
 });
 
 const recipeSchema = z
@@ -82,7 +78,21 @@ const recipeSchema = z
       return active === null || total === null || total >= active;
     },
     { message: "O tempo total não pode ser menor do que o tempo ativo." },
-  );
+  )
+  .superRefine(({ ingredients, steps }, context) => {
+    const ingredientIds = ingredients.map((ingredient) => ingredient.clientId);
+    if (new Set(ingredientIds).size !== ingredientIds.length) {
+      context.addIssue({ code: "custom", message: "Os ingredientes do formulário têm identificadores repetidos." });
+      return;
+    }
+    const available = new Set(ingredientIds);
+    for (const step of steps) {
+      if (step.ingredientClientIds.some((id) => !available.has(id))) {
+        context.addIssue({ code: "custom", message: "Um passo refere um ingrediente que já não existe." });
+        return;
+      }
+    }
+  });
 
 export type CreateRecipeState = {
   message?: string;
@@ -107,6 +117,26 @@ function parseArray(value: FormDataEntryValue | null): unknown {
   }
 }
 
+function recipeValidationMessage(error: z.ZodError) {
+  const issue = error.issues[0];
+  if (!issue) return "Confirma os dados da receita antes de guardar.";
+  if (issue.message === "O tempo total não pode ser menor do que o tempo ativo.") return issue.message;
+
+  const [field, index] = issue.path;
+  if (field === "title") return "Indica um título com pelo menos 2 caracteres.";
+  if (field === "ingredients") {
+    const label = typeof index === "number" ? `Ingrediente ${index + 1}` : "Ingredientes";
+    return `${label}: ${issue.message}`;
+  }
+  if (field === "steps") {
+    const label = typeof index === "number" ? `Passo ${index + 1}` : "Preparação";
+    return `${label}: ${issue.message}`;
+  }
+  if (field === "servings") return "Confirma o número inteiro de doses.";
+  if (field === "activeTime" || field === "totalTime") return "Confirma os tempos indicados.";
+  return issue.message || "Confirma os dados da receita antes de guardar.";
+}
+
 function draftTitle(value: unknown) {
   if (!value || typeof value !== "object" || !("title" in value)) return null;
   const title = (value as { title?: unknown }).title;
@@ -121,8 +151,14 @@ function optionalPositiveInteger(value: string) {
 
 function optionalPositiveNumber(value: string) {
   if (!value) return null;
-  const number = Number(value.replace(",", "."));
-  return Number.isFinite(number) && number > 0 ? number : Number.NaN;
+  const number = parseQuantityValue(value);
+  return number !== null && number > 0 ? number : Number.NaN;
+}
+
+function optionalPositiveCount(value: string) {
+  if (!value) return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : Number.NaN;
 }
 
 function ingredientDisplayText(ingredient: z.infer<typeof ingredientSchema>) {
@@ -167,6 +203,10 @@ function ingredientRows(
     const quantityMaxOriginal = optionalPositiveNumber(
       ingredient.originalQuantityMax ?? ingredient.quantityMax,
     );
+    const storedOriginalRange = comparableQuantityRange(
+      Number.isNaN(quantityOriginal) ? null : quantityOriginal,
+      Number.isNaN(quantityMaxOriginal) ? null : quantityMaxOriginal,
+    );
     const packageQuantity = optionalPositiveNumber(ingredient.packageQuantity);
     const unit = ingredient.unit || null;
     const displayText = ingredientDisplayText(ingredient);
@@ -180,12 +220,8 @@ function ingredientRows(
       optional: ingredient.optional,
       scalable: true,
       sort_order: index,
-      quantity_original: Number.isNaN(quantityOriginal)
-        ? null
-        : quantityOriginal,
-      quantity_max_original: Number.isNaN(quantityMaxOriginal)
-        ? null
-        : quantityMaxOriginal,
+      quantity_original: storedOriginalRange.quantity,
+      quantity_max_original: storedOriginalRange.quantityMax,
       unit_original: ingredient.originalUnit || unit,
       display_text_original: ingredient.originalText || displayText,
       quantity_normalized: Number.isNaN(quantity) ? null : quantity,
@@ -216,6 +252,7 @@ function stepRows(
       ? sectionIds.get(step.section.toLocaleLowerCase("pt-PT")) ?? null
       : null,
     instruction: step.instruction,
+    timer_seconds: step.timerSeconds,
     sort_order: index,
   }));
 }
@@ -481,20 +518,15 @@ export async function createRecipe(
   });
 
   if (!result.success) {
-    return {
-      message:
-        result.error.issues[0]?.message ===
-        "O tempo total não pode ser menor do que o tempo ativo."
-          ? result.error.issues[0].message
-          : "Confirma o título, os ingredientes e os passos antes de guardar.",
-    };
+    console.warn("Dados inválidos ao criar receita", result.error.issues.map((issue) => ({ path: issue.path, message: issue.message })));
+    return { message: recipeValidationMessage(result.error) };
   }
 
   const cover = coverFromForm(formData);
   const coverError = validateCover(cover);
   if (coverError) return { message: coverError };
 
-  const servings = optionalPositiveNumber(result.data.servings);
+  const servings = optionalPositiveCount(result.data.servings);
   const activeTime = optionalPositiveInteger(result.data.activeTime);
   const totalTime = optionalPositiveInteger(result.data.totalTime);
 
@@ -603,10 +635,12 @@ export async function createRecipe(
       .from("recipe_ingredients")
       .insert(
         ingredientRows(recipe.id, result.data.ingredients, structure.groupIds),
-      ),
+      )
+      .select("id,sort_order"),
     supabase
       .from("recipe_steps")
-      .insert(stepRows(recipe.id, result.data.steps, structure.sectionIds)),
+      .insert(stepRows(recipe.id, result.data.steps, structure.sectionIds))
+      .select("id,sort_order"),
     tags.ids.length
       ? supabase
           .from("recipe_tags")
@@ -639,6 +673,23 @@ export async function createRecipe(
     });
     await supabase.from("recipes").delete().eq("id", recipe.id);
     return { message: "A receita não ficou completa e não foi guardada." };
+  }
+
+  const links = buildStepIngredientRows(
+    result.data.ingredients,
+    result.data.steps,
+    ingredientsResult.data ?? [],
+    stepsResult.data ?? [],
+  );
+  if (links.length) {
+    const { error: linksError } = await supabase
+      .from("recipe_step_ingredients")
+      .insert(links);
+    if (linksError) {
+      console.error("Falha ao associar ingredientes aos passos", { code: linksError.code });
+      await supabase.from("recipes").delete().eq("id", recipe.id);
+      return { message: "Não foi possível associar os ingredientes aos passos. Confirma se a atualização da Supabase foi aplicada." };
+    }
   }
 
   if (importJob) {
@@ -706,14 +757,10 @@ export async function updateRecipe(
   });
 
   if (!result.success) {
-    return {
-      message:
-        result.error.issues[0]?.message ??
-        "Confirma os dados da receita antes de guardar.",
-    };
+    return { message: recipeValidationMessage(result.error) };
   }
 
-  const servings = optionalPositiveNumber(result.data.servings);
+  const servings = optionalPositiveCount(result.data.servings);
   const activeTime = optionalPositiveInteger(result.data.activeTime);
   const totalTime = optionalPositiveInteger(result.data.totalTime);
   const cover = coverFromForm(formData);
@@ -819,11 +866,11 @@ export async function updateRecipe(
     supabase
       .from("recipe_ingredients")
       .insert(ingredientRows(recipeId, result.data.ingredients, structure.groupIds))
-      .select("id"),
+      .select("id,sort_order"),
     supabase
       .from("recipe_steps")
       .insert(stepRows(recipeId, result.data.steps, structure.sectionIds))
-      .select("id"),
+      .select("id,sort_order"),
   ]);
 
   const newIngredientIds = (newIngredientsResult.data ?? []).map((row) => row.id);
@@ -854,6 +901,22 @@ export async function updateRecipe(
   if (newIngredientsResult.error || newStepsResult.error) {
     await removeNewRows();
     return { message: "Não foi possível atualizar ingredientes e passos." };
+  }
+
+  const newLinks = buildStepIngredientRows(
+    result.data.ingredients,
+    result.data.steps,
+    newIngredientsResult.data ?? [],
+    newStepsResult.data ?? [],
+  );
+  if (newLinks.length) {
+    const { error: linksError } = await supabase
+      .from("recipe_step_ingredients")
+      .insert(newLinks);
+    if (linksError) {
+      await removeNewRows();
+      return { message: "Não foi possível associar os ingredientes aos passos. Confirma se a atualização da Supabase foi aplicada." };
+    }
   }
 
   const { data: updatedRecipe, error: updateError } = await supabase

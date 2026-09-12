@@ -45,6 +45,51 @@ button { cursor: pointer; }
   transform-origin: 50% 75%;
 }
 
+@keyframes cookbook-step-next {
+  from { opacity: 0; transform: translateX(18px) rotate(.25deg); }
+  to { opacity: 1; transform: translateX(0) rotate(0); }
+}
+
+@keyframes cookbook-step-previous {
+  from { opacity: 0; transform: translateX(-18px) rotate(-.25deg); }
+  to { opacity: 1; transform: translateX(0) rotate(0); }
+}
+
+@keyframes cookbook-step-steam {
+  0%, 100% { transform: translateY(3px); opacity: .55; }
+  50% { transform: translateY(-3px); opacity: 1; }
+}
+
+.cookbook-step-next { animation: cookbook-step-next .32s cubic-bezier(.22, 1, .36, 1); }
+.cookbook-step-previous { animation: cookbook-step-previous .32s cubic-bezier(.22, 1, .36, 1); }
+.cookbook-step-steam { animation: cookbook-step-steam 2.8s ease-in-out infinite; }
+
+@keyframes cookbook-loading-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: .45; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+.cookbook-loading-dot { animation: cookbook-loading-dot 1.15s ease-in-out infinite; }
+
+@keyframes cookbook-discovery-card {
+  from { opacity: 0; transform: translateY(8px) rotate(.15deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+.cookbook-discovery-card { animation: cookbook-discovery-card .38s cubic-bezier(.22, 1, .36, 1); }
+
+@keyframes cookbook-favourite-reaction {
+  0% { opacity: 0; transform: translateY(10px) scale(.72) rotate(-3deg); }
+  16% { opacity: 1; transform: translateY(-3px) scale(1.05) rotate(1deg); }
+  28%, 76% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translateY(-5px) scale(.96) rotate(0); }
+}
+
+.cookbook-favourite-reaction {
+  animation: cookbook-favourite-reaction 1.6s cubic-bezier(.22, 1, .36, 1) both;
+  transform-origin: 70% 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
@@ -52,4 +97,5 @@ button { cursor: pointer; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+  .cookbook-favourite-reaction { animation: none !important; opacity: 1; }
 }

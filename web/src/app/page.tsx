@@ -6,6 +6,8 @@ import HomeLoadingSkeleton from "@/components/home-loading-skeleton";
 import type { RecipeDifficulty, RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/server";
 
+const INITIAL_VISIBLE_RECIPE_COUNT = 12;
+
 function nameFromEmail(email: string | undefined) {
   const localPart = email?.split("@")[0]?.trim();
 
@@ -64,7 +66,7 @@ async function HomeContent() {
       : [];
     return images.find((image) => image.image_kind === "cover")?.storage_path;
   });
-  const validCoverPaths = coverPaths.filter(
+  const validCoverPaths = coverPaths.slice(0, INITIAL_VISIBLE_RECIPE_COUNT).filter(
     (path): path is string => Boolean(path),
   );
   const signedCoverUrls = new Map<string, string>();
@@ -91,6 +93,7 @@ async function HomeContent() {
       difficulty: recipe.difficulty as RecipeDifficulty,
       createdByName: authors.get(recipe.created_by) ?? "Cookbook",
       isFavourite: favourites.has(recipe.id),
+      coverPath: coverPaths[index] ?? null,
       coverUrl: coverPaths[index]
         ? signedCoverUrls.get(coverPaths[index] as string) ?? null
         : null,

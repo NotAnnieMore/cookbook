@@ -54,11 +54,11 @@ export default function RecipeHero({
   const visibleTags = tags.slice(0, 4);
 
   return (
-    <section className="overflow-hidden rounded-[2rem_2rem_5rem_2rem] text-white shadow-[0_14px_0_#E3DCD0] transition-colors duration-500" style={{ backgroundColor: palette.colour }} aria-busy={!palette.isReady}>
+    <section className="overflow-hidden rounded-[2rem_2rem_5rem_2rem] text-white shadow-[0_14px_0_#E3DCD0]" style={{ backgroundColor: palette.isReady ? palette.colour : "#E8E0D4" }} aria-busy={!palette.isReady}>
       {!palette.isReady ? (
         <HeroSkeleton />
       ) : (
-        <div className="grid grid-rows-[24rem_13rem] animate-[cookbook-reveal_.28s_ease-out] sm:grid-rows-[34rem_22rem] lg:h-[33rem] lg:grid-cols-[1.05fr_.95fr] lg:grid-rows-none">
+        <div className="grid grid-rows-[24rem_13rem] sm:grid-rows-[34rem_22rem] lg:h-[33rem] lg:grid-cols-[1.05fr_.95fr] lg:grid-rows-none">
           <div
             className="relative isolate flex h-full min-h-0 flex-col justify-center overflow-hidden bg-cover bg-center p-5 transition-colors duration-500 sm:p-11 lg:p-14"
             style={coverUrl ? { backgroundColor: palette.colour, backgroundImage: `linear-gradient(${palette.colour}E0, ${palette.colour}E0), url("${coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: palette.colour }}

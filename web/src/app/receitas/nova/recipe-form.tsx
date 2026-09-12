@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 
 import ImageCropper from "@/components/image-cropper";
-import { durationInputToMinutes, formatDurationInput } from "@/lib/recipes/duration";
+import { durationInputToMinutes, formatDurationInput, formatTimerInput, timerInputToSeconds } from "@/lib/recipes/duration";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
 import { createRecipe, type CreateRecipeState } from "./actions";
@@ -27,7 +28,12 @@ export type RecipeFormIngredient = {
   conversionRuleVersion?: string;
 };
 
-export type RecipeFormStep = { id: number; instruction: string };
+export type RecipeFormStep = {
+  id: number;
+  instruction: string;
+  ingredientIds: number[];
+  timerDuration: string;
+};
 
 export type RecipeFormValues = {
   title: string;
@@ -37,8 +43,8 @@ export type RecipeFormValues = {
   totalTime: string;
   difficulty: "easy" | "medium" | "hard" | "";
   tags: string[];
-  ingredients: (Omit<RecipeFormIngredient, "id" | "detailsOpen"> & { group: string })[];
-  steps: (Omit<RecipeFormStep, "id"> & { section: string })[];
+  ingredients: (Omit<RecipeFormIngredient, "id" | "detailsOpen"> & { group: string; sourceId?: string })[];
+  steps: (Omit<RecipeFormStep, "id" | "ingredientIds" | "timerDuration"> & { section: string; ingredientSourceIds?: string[]; timerSeconds?: number | null })[];
   coverUrl?: string | null;
 };
 
@@ -47,7 +53,7 @@ type PreparationPhase = { id: number; title: string; steps: RecipeFormStep[] };
 type RecipeFormAction = (previousState: CreateRecipeState, formData: FormData) => Promise<CreateRecipeState>;
 
 const initialState: CreateRecipeState = {};
-const units = ["g", "kg", "ml", "l", "c. chá", "c. sopa", "unid.", "lata", "dente", "folha", "ramo", "pitada", "q.b."];
+const units = ["g", "kg", "ml", "l", "c. chá", "c. sopa", "unid.", "lata", "pacote", "folha", "ramo", "pitada", "q.b."];
 const inputClass = "min-h-12 w-full rounded-2xl border border-[#D8D0C4] bg-[#FFFCF6] px-4 text-base font-semibold text-[#27231F] outline-none transition placeholder:font-normal placeholder:text-[#999187] focus:border-[#285240] focus:ring-3 focus:ring-[#285240]/12";
 
 function cleanTags(values: string[]) {
@@ -80,7 +86,10 @@ function ingredientPartsFrom(values: RecipeFormValues | undefined) {
 }
 
 function preparationPhasesFrom(values: RecipeFormValues | undefined) {
-  if (!values?.steps.length) return [{ id: 3, title: "", steps: [{ id: 4, instruction: "" }] }];
+  if (!values?.steps.length) return [{ id: 3, title: "", steps: [{ id: 4, instruction: "", ingredientIds: [], timerDuration: "" }] }];
+  const ingredientIds = new Map(
+    values.ingredients.flatMap((ingredient, index) => ingredient.sourceId ? [[ingredient.sourceId, 1000 + index] as const] : []),
+  );
   const phases: PreparationPhase[] = [];
   values.steps.forEach((step, index) => {
     const key = step.section.trim().toLocaleLowerCase("pt-PT");
@@ -89,7 +98,15 @@ function preparationPhasesFrom(values: RecipeFormValues | undefined) {
       phase = { id: 500 + phases.length, title: step.section, steps: [] };
       phases.push(phase);
     }
-    phase.steps.push({ id: 2000 + index, instruction: step.instruction });
+    phase.steps.push({
+      id: 2000 + index,
+      instruction: step.instruction,
+      timerDuration: formatTimerInput(step.timerSeconds),
+      ingredientIds: (step.ingredientSourceIds ?? []).flatMap((sourceId) => {
+        const ingredientId = ingredientIds.get(sourceId);
+        return ingredientId === undefined ? [] : [ingredientId];
+      }),
+    });
   });
   return phases;
 }
@@ -191,16 +208,42 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
   }
 
   function updateIngredient(partId: number, ingredientId: number, changes: Partial<RecipeFormIngredient>) {
-    setIngredientParts((current) => current.map((part) => part.id === partId ? { ...part, ingredients: part.ingredients.map((ingredient) => ingredient.id === ingredientId ? { ...ingredient, ...changes } : ingredient) } : part));
+    const changesCurrentValue = ["name", "quantity", "quantityMax", "unit", "packageQuantity", "packageUnit"]
+      .some((field) => Object.hasOwn(changes, field));
+    const nextChanges = changesCurrentValue
+      ? { ...changes, conversionConfidence: "exact" as const, conversionSource: "manual" }
+      : changes;
+    setIngredientParts((current) => current.map((part) => part.id === partId ? { ...part, ingredients: part.ingredients.map((ingredient) => ingredient.id === ingredientId ? { ...ingredient, ...nextChanges } : ingredient) } : part));
   }
 
   function removeIngredient(partId: number, ingredientId: number) {
     setIngredientParts((current) => current.map((part) => part.id === partId ? { ...part, ingredients: part.ingredients.filter((ingredient) => ingredient.id !== ingredientId) } : part).filter((part) => part.ingredients.length > 0));
+    setPreparationPhases((current) => current.map((phase) => ({
+      ...phase,
+      steps: phase.steps.map((step) => ({
+        ...step,
+        ingredientIds: step.ingredientIds.filter((id) => id !== ingredientId),
+      })),
+    })));
     setIngredientRemoval(null);
   }
 
-  function updateStep(phaseId: number, stepId: number, instruction: string) {
-    setPreparationPhases((current) => current.map((phase) => phase.id === phaseId ? { ...phase, steps: phase.steps.map((step) => step.id === stepId ? { ...step, instruction } : step) } : phase));
+  function removeIngredientPart(partId: number) {
+    const removedIds = new Set(
+      ingredientParts.find((part) => part.id === partId)?.ingredients.map((ingredient) => ingredient.id) ?? [],
+    );
+    setIngredientParts((current) => current.filter((part) => part.id !== partId));
+    setPreparationPhases((current) => current.map((phase) => ({
+      ...phase,
+      steps: phase.steps.map((step) => ({
+        ...step,
+        ingredientIds: step.ingredientIds.filter((id) => !removedIds.has(id)),
+      })),
+    })));
+  }
+
+  function updateStep(phaseId: number, stepId: number, changes: Partial<RecipeFormStep>) {
+    setPreparationPhases((current) => current.map((phase) => phase.id === phaseId ? { ...phase, steps: phase.steps.map((step) => step.id === stepId ? { ...step, ...changes } : step) } : phase));
   }
 
   function removeStep(phaseId: number, stepId: number) {
@@ -214,14 +257,33 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
 
   const ingredientCount = ingredientParts.reduce((total, part) => total + part.ingredients.length, 0);
   const stepCount = preparationPhases.reduce((total, phase) => total + phase.steps.length, 0);
-  const serializedIngredients = ingredientParts.flatMap((part) => part.ingredients.map(({ name, quantity, quantityMax, unit, optional, packageQuantity, packageUnit, originalQuantity, originalQuantityMax, originalUnit, originalText, conversionConfidence, conversionSource, conversionRuleVersion }) => ({ name, quantity, quantityMax, unit, optional, group: part.title, packageQuantity, packageUnit, originalQuantity, originalQuantityMax, originalUnit, originalText, conversionConfidence, conversionSource, conversionRuleVersion })));
-  const serializedSteps = preparationPhases.flatMap((phase) => phase.steps.map(({ instruction }) => ({ instruction, section: phase.title })));
+  const ingredientOptions = ingredientParts.flatMap((part) => part.ingredients.map((ingredient, index) => ({
+    id: ingredient.id,
+    name: ingredient.name.trim() || `Ingrediente ${index + 1}`,
+    group: part.title.trim(),
+  })));
+  const serializedIngredients = ingredientParts.flatMap((part) => part.ingredients.map(({ id, name, quantity, quantityMax, unit, optional, packageQuantity, packageUnit, originalQuantity, originalQuantityMax, originalUnit, originalText, conversionConfidence, conversionSource, conversionRuleVersion }) => ({ clientId: id, name, quantity, quantityMax, unit, optional, group: part.title, packageQuantity, packageUnit, originalQuantity, originalQuantityMax, originalUnit, originalText, conversionConfidence, conversionSource, conversionRuleVersion })));
+  const serializedSteps = preparationPhases.flatMap((phase) => phase.steps.map(({ instruction, ingredientIds, timerDuration }) => {
+    const timerSeconds = timerInputToSeconds(timerDuration);
+    return { instruction, section: phase.title, ingredientClientIds: ingredientIds, timerSeconds: timerSeconds === null ? null : Number.isFinite(timerSeconds) ? timerSeconds : "invalid" };
+  }));
   const serializedTags = cleanTags([...tags, ...tagDraft.split(",")]);
   const totalTimeValue = durationInputToMinutes(totalTimeInput);
   const totalTimeInvalid = totalTimeValue === "invalid";
+  const timersInvalid = preparationPhases.some((phase) => phase.steps.some((step) => {
+    const seconds = timerInputToSeconds(step.timerDuration);
+    return seconds !== null && (!Number.isFinite(seconds) || seconds > 7 * 24 * 60 * 60);
+  }));
+
+  function submitRecipe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    submitting.current = true;
+    startTransition(() => formAction(formData));
+  }
 
   return (
-    <form action={formAction} onSubmit={() => { submitting.current = true; }} className="mx-auto max-w-5xl px-5 pb-24 sm:px-8">
+    <form onSubmit={submitRecipe} className="mx-auto max-w-5xl px-5 pb-24 sm:px-8">
       <input type="hidden" name="ingredients_json" value={JSON.stringify(serializedIngredients)} />
       <input type="hidden" name="steps_json" value={JSON.stringify(serializedSteps)} />
       <input type="hidden" name="tags_json" value={JSON.stringify(serializedTags)} />
@@ -243,7 +305,7 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
         <section className="rounded-[4.5rem_2rem_2rem_2rem] bg-[#E5EBDD] p-6 sm:p-8">
           <SectionHeading number="2" title="Tempos e doses" note="O tempo ativo é o trabalho; o total inclui forno, repouso, frio ou espera." />
           <div className="grid grid-cols-2 gap-4">
-            <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-extrabold">Doses</span><div className="relative"><input className={`${inputClass} pr-20`} name="servings" inputMode="decimal" placeholder="4" defaultValue={initialValues?.servings} /><span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-[#766F67]">pessoas</span></div></label>
+            <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-extrabold">Doses</span><div className="relative"><input className={`${inputClass} pr-20`} name="servings" type="number" inputMode="numeric" min="1" step="1" placeholder="4" defaultValue={initialValues?.servings} /><span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-[#766F67]">pessoas</span></div><span className="mt-1.5 block text-xs leading-5 text-[#667064]">Usamos sempre um número inteiro de pessoas.</span></label>
             <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-extrabold">Dificuldade</span><select className={inputClass} name="difficulty" defaultValue={initialValues?.difficulty ?? "easy"}><option value="">Por definir</option><option value="easy">Fácil</option><option value="medium">Média</option><option value="hard">Exigente</option></select></label>
             <label><span className="mb-2 block text-sm font-extrabold">Tempo ativo</span><div className="relative"><input className={`${inputClass} pr-12`} name="active_time" type="number" min="0" step="1" placeholder="20" defaultValue={initialValues?.activeTime} /><span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-[#766F67]">min</span></div><span className="mt-1.5 block text-xs leading-5 text-[#667064]">Tempo passado realmente a preparar.</span></label>
             <label><span className="mb-2 block text-sm font-extrabold">Tempo total</span><input className={inputClass} type="text" inputMode="text" placeholder="Ex.: 4h 30min" value={totalTimeInput} onChange={(event) => setTotalTimeInput(event.target.value)} aria-invalid={totalTimeInvalid} aria-describedby="total-time-help" /><span id="total-time-help" className={`mt-1.5 block text-xs leading-5 ${totalTimeInvalid ? "font-bold text-[#9A402F]" : "text-[#667064]"}`}>{totalTimeInvalid ? "Usa, por exemplo, 6h, 4h 30min ou 45min." : "Até ficar pronto a servir. Podes escrever 6h, 4h 30min ou 45min."}</span></label>
@@ -268,7 +330,7 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
             <div key={part.id} className="overflow-hidden rounded-[2rem_2rem_3.5rem_2rem] border border-[#DDD5C9] bg-[#FFFCF6]">
               <div className="flex items-end gap-3 bg-[#E5EBDD]/70 p-4 sm:p-5">
                 <label className="flex-1"><span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-[#617064]">Parte {partIndex + 1} <span className="font-normal normal-case tracking-normal">{ingredientParts.length === 1 ? "(opcional)" : ""}</span></span><input className={inputClass} value={part.title} onChange={(event) => setIngredientParts((current) => current.map((item) => item.id === part.id ? { ...item, title: event.target.value } : item))} placeholder="Ex.: Base do cheesecake" maxLength={80} required={ingredientParts.length > 1} /></label>
-                <button type="button" onClick={() => setIngredientParts((current) => current.filter((item) => item.id !== part.id))} disabled={ingredientParts.length === 1} className="grid size-11 shrink-0 place-items-center rounded-full text-[#A44B3A] hover:bg-[#FBE5DF] disabled:opacity-25" aria-label={`Remover parte ${partIndex + 1}`}><Trash /></button>
+                <button type="button" onClick={() => removeIngredientPart(part.id)} disabled={ingredientParts.length === 1} className="grid size-11 shrink-0 place-items-center rounded-full text-[#A44B3A] hover:bg-[#FBE5DF] disabled:opacity-25" aria-label={`Remover parte ${partIndex + 1}`}><Trash /></button>
               </div>
               <div className="space-y-3 p-4 sm:p-5">
                 {part.ingredients.map((ingredient, ingredientIndex) => (
@@ -308,18 +370,51 @@ export default function RecipeForm({ displayName, action = createRecipe, mode = 
               <ol className="space-y-3">
                 {phase.steps.map((step, stepIndex) => {
                   const number = preparationPhases.slice(0, phaseIndex).reduce((total, item) => total + item.steps.length, 0) + stepIndex + 1;
-                  return <li key={step.id} className="flex items-start gap-3"><span className="mt-2 grid size-9 shrink-0 place-items-center rounded-full bg-[#285240] font-serif font-black text-white">{number}</span><label className="sr-only" htmlFor={`step-${step.id}`}>Passo {number}</label><textarea id={`step-${step.id}`} className={`${inputClass} min-h-24 flex-1 resize-y py-3`} value={step.instruction} onChange={(event) => updateStep(phase.id, step.id, event.target.value)} placeholder={number === 1 ? "Ex.: Triturar a bolacha e envolver com a manteiga." : "Descreve o passo seguinte…"} required /><button type="button" onClick={() => removeStep(phase.id, step.id)} disabled={stepCount === 1} className="mt-1 grid size-11 shrink-0 place-items-center rounded-full text-[#6B342A] hover:bg-white/45 disabled:opacity-25" aria-label={`Remover passo ${number}`}><Trash /></button></li>;
+                  const timerSeconds = timerInputToSeconds(step.timerDuration);
+                  const timerInvalid = timerSeconds !== null && (!Number.isFinite(timerSeconds) || timerSeconds > 7 * 24 * 60 * 60);
+                  return (
+                    <li key={step.id} className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
+                      <span className="mt-2 grid size-9 shrink-0 place-items-center rounded-full bg-[#285240] font-serif font-black text-white">{number}</span>
+                      <div className="min-w-0">
+                        <label className="sr-only" htmlFor={`step-${step.id}`}>Passo {number}</label>
+                        <textarea id={`step-${step.id}`} className={`${inputClass} min-h-24 resize-y py-3`} value={step.instruction} onChange={(event) => updateStep(phase.id, step.id, { instruction: event.target.value })} placeholder={number === 1 ? "Ex.: Triturar a bolacha e envolver com a manteiga." : "Descreve o passo seguinte…"} required />
+                        <label className="mt-2 block rounded-2xl border border-[#BDD2DD] bg-[#FFFCF6]/75 p-3 sm:grid sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-4">
+                          <span><strong className="block text-sm text-[#285240]">Temporizador</strong><span className="text-[11px] text-[#6F7778]">Opcional neste passo</span></span>
+                          <span><input type="text" inputMode="text" value={step.timerDuration} onChange={(event) => updateStep(phase.id, step.id, { timerDuration: event.target.value })} placeholder="Ex.: 10min ou 1h 30min" aria-invalid={timerInvalid} className={`${inputClass} mt-2 sm:mt-0 ${timerInvalid ? "border-[#A94834] focus:border-[#A94834]" : ""}`} />{timerInvalid ? <span className="mt-1 block text-xs font-bold text-[#913D2D]">Usa uma duração entre 1 minuto e 7 dias.</span> : step.timerDuration ? <span className="mt-1 block text-xs text-[#5F7467]">No Modo Cozinhar aparecerá “Temporizar {step.timerDuration}”.</span> : null}</span>
+                        </label>
+                        <details className="mt-2 rounded-2xl border border-[#BDD2DD] bg-[#FFFCF6]/75 px-4 py-3">
+                          <summary className="cursor-pointer text-sm font-extrabold text-[#285240]">
+                            Ingredientes deste passo
+                            <span className="ml-2 font-semibold text-[#6F7778]">{step.ingredientIds.length ? `${step.ingredientIds.length} selecionado${step.ingredientIds.length === 1 ? "" : "s"}` : "opcional"}</span>
+                          </summary>
+                          <p className="mt-2 text-xs leading-5 text-[#6F7778]">Seleciona apenas o que deve ficar à mão neste passo. A lista completa continua sempre disponível.</p>
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {ingredientOptions.map((ingredient) => {
+                              const selected = step.ingredientIds.includes(ingredient.id);
+                              return (
+                                <label key={ingredient.id} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm font-bold transition ${selected ? "border-[#285240] bg-[#E5EBDD] text-[#285240]" : "border-[#DDD5C9] bg-[#FFFCF6] text-[#615B55]"}`}>
+                                  <input type="checkbox" checked={selected} onChange={() => updateStep(phase.id, step.id, { ingredientIds: selected ? step.ingredientIds.filter((id) => id !== ingredient.id) : [...step.ingredientIds, ingredient.id] })} className="size-4 accent-[#285240]" />
+                                  <span className="min-w-0"><span className="block truncate">{ingredient.name}</span>{ingredient.group ? <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-[#77847C]">{ingredient.group}</span> : null}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      </div>
+                      <button type="button" onClick={() => removeStep(phase.id, step.id)} disabled={stepCount === 1} className="mt-1 grid size-11 shrink-0 place-items-center rounded-full text-[#6B342A] hover:bg-white/45 disabled:opacity-25" aria-label={`Remover passo ${number}`}><Trash /></button>
+                    </li>
+                  );
                 })}
               </ol>
-              <button type="button" onClick={() => setPreparationPhases((current) => current.map((item) => item.id === phase.id ? { ...item, steps: [...item.steps, { id: nextId(), instruction: "" }] } : item))} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#FFFCF6] px-4 text-sm font-extrabold text-[#285240]"><Plus />Adicionar passo a esta fase</button>
+              <button type="button" onClick={() => setPreparationPhases((current) => current.map((item) => item.id === phase.id ? { ...item, steps: [...item.steps, { id: nextId(), instruction: "", ingredientIds: [], timerDuration: "" }] } : item))} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#FFFCF6] px-4 text-sm font-extrabold text-[#285240]"><Plus />Adicionar passo a esta fase</button>
             </div>
           ))}
         </div>
-        <button type="button" onClick={() => { const phaseId = nextId(); setPreparationPhases((current) => [...current, { id: phaseId, title: "", steps: [{ id: nextId(), instruction: "" }] }]); }} className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#285240] px-5 text-sm font-extrabold text-white shadow-[0_4px_0_#193A2B]"><Plus />Adicionar outra fase</button>
+        <button type="button" onClick={() => { const phaseId = nextId(); setPreparationPhases((current) => [...current, { id: phaseId, title: "", steps: [{ id: nextId(), instruction: "", ingredientIds: [], timerDuration: "" }] }]); }} className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#285240] px-5 text-sm font-extrabold text-white shadow-[0_4px_0_#193A2B]"><Plus />Adicionar outra fase</button>
       </section>
 
       {state.message ? <p role="alert" className="mt-7 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">{state.message}</p> : null}
-      <div className="mt-8 flex flex-col-reverse items-stretch justify-between gap-4 sm:flex-row sm:items-center"><p className="text-center text-sm text-[#766F67] sm:text-left">{mode === "edit" ? "Alterações guardadas por" : "Será guardada por"} <strong className="text-[#27231F]">{displayName}</strong>.</p><button type="submit" disabled={pending || externalChange || totalTimeInvalid} className="min-h-14 rounded-full bg-[#F36F56] px-8 text-base font-extrabold text-white shadow-[0_6px_0_#D94F38] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60">{pending ? "A guardar…" : externalChange ? "Atualiza antes de guardar" : totalTimeInvalid ? "Confirma o tempo total" : mode === "edit" ? "Guardar alterações" : "Guardar receita"}</button></div>
+      <div className="mt-8 flex flex-col-reverse items-stretch justify-between gap-4 sm:flex-row sm:items-center"><p className="text-center text-sm text-[#766F67] sm:text-left">{mode === "edit" ? "Alterações guardadas por" : "Será guardada por"} <strong className="text-[#27231F]">{displayName}</strong>.</p><button type="submit" disabled={pending || externalChange || totalTimeInvalid || timersInvalid} className="min-h-14 rounded-full bg-[#F36F56] px-8 text-base font-extrabold text-white shadow-[0_6px_0_#D94F38] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60">{pending ? "A guardar…" : externalChange ? "Atualiza antes de guardar" : totalTimeInvalid ? "Confirma o tempo total" : timersInvalid ? "Confirma os temporizadores" : mode === "edit" ? "Guardar alterações" : "Guardar receita"}</button></div>
       {cropSource ? <ImageCropper sourceUrl={cropSource.url} fileName={cropSource.fileName} onCancel={() => closeCropper()} onApply={applyCroppedCover} /> : null}
     </form>
   );

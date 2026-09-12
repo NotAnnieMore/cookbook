@@ -3,6 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getSupabaseConfig } from "./config";
 
+function protectPrivateResponse(response: NextResponse) {
+  response.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return response;
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const { url, publishableKey } = getSupabaseConfig();
@@ -40,15 +47,15 @@ export async function updateSession(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
-    return NextResponse.redirect(loginUrl);
+    return protectPrivateResponse(NextResponse.redirect(loginUrl));
   }
 
   if (claims && isLoginPage) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = "/";
     homeUrl.search = "";
-    return NextResponse.redirect(homeUrl);
+    return protectPrivateResponse(NextResponse.redirect(homeUrl));
   }
 
-  return response;
+  return protectPrivateResponse(response);
 }

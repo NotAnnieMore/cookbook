@@ -1,61 +1,76 @@
-# Cookbook
+<p align="center">
+  <img src="./web/public/brand/cookbook-mascot-mark.svg" width="92" alt="Chef Pitéu, mascote do Cookbook" />
+</p>
 
-Cookbook é uma aplicação privada para guardar, consultar e cozinhar receitas em
-conjunto. A experiência é desenhada primeiro para telemóvel e tablet, com uma
-linguagem visual quente, editorial e assumidamente culinária.
+<h1 align="center">Cookbook</h1>
 
-## O que já funciona
+<p align="center">
+  <strong>Pequenas receitas, grandes histórias.</strong><br />
+  Um livro de receitas privado, partilhado e feito para cozinhar em conjunto.
+</p>
 
-- autenticação privada para contas criadas manualmente;
-- coleção de receitas partilhada entre os membros da casa;
-- criação manual com doses, tempo ativo e tempo total escrito naturalmente (`6h`, `4h 30min` ou `45min`), dificuldade, ingredientes e passos;
-- edição protegida contra conflitos entre dispositivos;
-- fotografia principal privada, substituível, com enquadramento 3:2 escolhido pelo
-  utilizador, validação e otimização automática para WebP;
-- caixote temporário com restauro de receitas;
-- grupos de ingredientes e secções de preparação;
-- ajuste temporário das quantidades ao número de pessoas;
-- intervalos de quantidade e tamanho real de latas/embalagens;
-- medidas europeias por defeito, conversões americanas e referências por ingrediente;
-- importação de texto com preservação da fonte e preview editável obrigatório;
-- importação segura de páginas públicas por URL, com Schema.org, fallback HTML e preview;
-- organização assistida pelo Gemini 3.5 Flash-Lite quando os parsers não conseguem
-  separar uma página, usando apenas texto público limpo e nunca acesso direto ao URL;
-- adaptador TikTok via oEmbed, com separação automática de listas inline e grupos,
-  remoção de emojis, limpeza de espaços repetidos e capitalização de ingredientes
-  e preparação;
-- adaptador Instagram para posts e reels públicos, com links canónicos, extração
-  de legendas públicas e fallback assistido quando a plataforma bloqueia a leitura;
-- etiquetas e filtros combináveis;
-- painéis de destaque na coleção e na receita com paleta adaptativa derivada da fotografia;
-- autoria visível e favoritos individuais;
-- pesquisa por receita, ingrediente, autor ou etiqueta, destaque aleatório e
-  página completa de cada receita;
-- sincronização em tempo real de receitas e favoritos;
-- interface responsiva com navegação própria para telemóvel e tablet/desktop;
-- Row Level Security e armazenamento privado preparados na Supabase.
+<p align="center">
+  <code>mobile first</code> · <code>PWA</code> · <code>PT-PT</code> · <code>tempo real</code>
+</p>
 
-## Stack
+---
 
-- Next.js 16 e React 19;
-- TypeScript e Tailwind CSS 4;
-- Supabase Auth, Postgres, Realtime e Storage;
-- Zod para validação dos dados recebidos no servidor.
+## Da coleção até à mesa
 
-## Estrutura
+O Cookbook junta num só lugar as receitas de Ivo e Ana. Foi desenhado primeiro
+para telemóvel e tablet, com uma linguagem visual caseira, editorial e prática.
+
+<table>
+  <tr>
+    <td width="68%" align="center">
+      <img src="./docs/readme/recipe-desktop.webp" alt="Página de uma receita no Cookbook em computador" />
+      <br /><sub>Receita completa, fotografia, tempos, doses e autoria.</sub>
+    </td>
+    <td width="32%" align="center">
+      <img src="./docs/readme/home-mobile.webp" alt="Página inicial do Cookbook em telemóvel" />
+      <br /><sub>Sugestão diária adaptada à fotografia.</sub>
+    </td>
+  </tr>
+</table>
+
+## O essencial
+
+- coleção partilhada com pesquisa, etiquetas, favoritos e avaliações individuais;
+- criação e edição manual, medidas europeias e ajuste das doses por pessoas;
+- importação por texto ou ligação, com Gemini como apoio quando a página é difícil de ler;
+- fotografias privadas com recorte escolhido pelo utilizador e otimização automática em WebP;
+- Modo Cozinhar com passos, ingredientes contextuais, progresso e vários temporizadores;
+- sincronização em tempo real, caixote, cópia de segurança e instalação como PWA.
+
+## Chef Pitéu
+
+O Chef Pitéu é a identidade visual e o pequeno anfitrião da aplicação. As suas
+poses acompanham a leitura, a descoberta, a cozinha, os estados de carregamento
+e os momentos de celebração sem transformar a interface num desenho infantil.
+
+<p align="center">
+  <img src="./docs/readme/chef-piteu-brand-board.webp" width="760" alt="Brand board do Chef Pitéu com poses, expressões, detalhes e paleta do Cookbook" />
+</p>
+
+## Como foi construído
+
+| Camada | Tecnologia |
+| --- | --- |
+| Interface | Next.js 16, React 19, TypeScript e Tailwind CSS 4 |
+| Dados | Supabase Postgres, Auth, Realtime e Storage privado |
+| Validação e imagem | Zod e Sharp |
+| Importação assistida | Google Gemini, usado apenas como fallback ou revisão explícita |
 
 ```text
 web/
-├── src/app/          # páginas, rotas dinâmicas e Server Actions
-├── src/components/   # interface reutilizável
-├── src/lib/          # clientes Supabase e tipos de domínio
-└── supabase/         # schema, políticas RLS, Realtime e Storage
+├── src/app/          páginas, rotas e ações de servidor
+├── src/components/   interface reutilizável
+├── src/lib/          domínio, importação e clientes Supabase
+└── supabase/         schema, políticas RLS e configuração de Storage
 ```
 
-Os ficheiros de contexto de produto e as referências visuais são material local
-de trabalho e não fazem parte do repositório público.
-
-## Configuração local
+<details>
+<summary><strong>Executar localmente</strong></summary>
 
 É necessário Node.js 20.9 ou superior e um projeto Supabase dedicado.
 
@@ -74,14 +89,10 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=SUA_CHAVE_PUBLICA
 GEMINI_API_KEY=SUA_CHAVE_PRIVADA_DO_GOOGLE_AI_STUDIO
 ```
 
-No SQL Editor da Supabase, executar pela ordem indicada:
+As instruções para criar a base de dados estão em
+[`web/supabase/README.md`](./web/supabase/README.md).
 
-1. `web/supabase/schemas/01_core.sql`
-2. `web/supabase/schemas/02_storage.sql`
-3. Criar manualmente os utilizadores em Authentication
-4. Ajustar e executar `web/supabase/setup/01_household_ivo_ana.sql`
-
-A aplicação fica disponível em `http://127.0.0.1:3000`.
+</details>
 
 ## Verificação
 
@@ -92,15 +103,9 @@ npm test
 npm run build
 ```
 
-## Próximas fases
+O guia completo para publicar na Vercel e ligar um subdomínio da OVH está em
+[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 
-- galeria de fotografias por receita;
-- eventual leitura multimodal de publicações apenas como fallback explícito;
-- modo cozinha com gestos, progresso e temporizadores;
-- backups exportáveis e recuperação testada.
+---
 
-## Deploy
-
-Na Vercel, configurar `web` como **Root Directory**. As variáveis da Supabase e
-`GEMINI_API_KEY` devem ser definidas diretamente nas Environment Variables do
-projeto e nunca incluídas no repositório.
+<p align="center"><em>Receitas também unem pessoas. Cozinhar é cuidar.</em></p>

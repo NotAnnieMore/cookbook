@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { RecipeSummary } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/client";
 
 import AppDecorations from "./app-decorations";
-import { CookbookMascotIllustration, CookbookMascotLoader, CookbookMascotMark } from "./cookbook-mascot";
+import { CookbookMascotFavouriteReaction, CookbookMascotIllustration, CookbookMascotLoader, CookbookMascotMark } from "./cookbook-mascot";
+import PwaInstallAction from "./pwa-install-action";
 import { useAdaptiveRecipeColour } from "./use-adaptive-recipe-colour";
 
 type IconName =
@@ -20,7 +21,9 @@ type IconName =
   | "search"
   | "heart"
   | "clock"
+  | "cook"
   | "shuffle"
+  | "shield"
   | "trash"
   | "logout"
   | "arrow";
@@ -32,8 +35,18 @@ const difficultyLabels = {
 } as const;
 
 const cardColours = ["#F2A58B", "#F3C565", "#A9C7B2", "#AFC9DA"];
+const RECIPES_PER_BATCH = 12;
 type QuickFilter = "favourites" | "quick" | "easy";
-type HomeSection = "topo" | "receitas" | "descobrir";
+type HomeSection = "topo" | "receitas";
+
+function subscribeToStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
+function noSubscription() {
+  return () => undefined;
+}
 
 function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -44,7 +57,9 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
     search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
     heart: <path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.4 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/>,
     clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    cook: <><path d="M5 11h14l-1 8H6l-1-8Z"/><path d="M3 11h18M8 7c-2-2 1-3 0-5M13 7c-2-2 1-3 0-5M18 7c-2-2 1-3 0-5"/></>,
     shuffle: <><path d="M3 7h3c4 0 5 10 9 10h6"/><path d="m18 14 3 3-3 3"/><path d="M3 17h3c1.4 0 2.4-1.2 3.3-2.8M14.4 7.8C15.6 7.2 17 7 18 7h3"/><path d="m18 4 3 3-3 3"/></>,
+    shield: <><path d="M12 3 5 6v5c0 4.6 2.8 8 7 10 4.2-2 7-5.4 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></>,
     logout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></>,
     arrow: <><path d="M5 12h14M14 7l5 5-5 5"/></>,
@@ -122,6 +137,14 @@ function RecipeArtwork({ recipe, index, featured = false }: { recipe: RecipeSumm
     );
   }
 
+  if (recipe.coverPath) {
+    return (
+      <div className={`grid animate-pulse place-items-center bg-[#E4DDD1] ${featured ? "absolute -inset-px" : "h-52"}`} role="status" aria-label={`A carregar fotografia de ${recipe.title}`}>
+        <CookbookMascotMark className="size-14 opacity-70" />
+      </div>
+    );
+  }
+
   return (
     <div className={`relative overflow-hidden ${featured ? "absolute -inset-px" : "h-52"}`} style={{ backgroundColor: colour }} role="img" aria-label={`Ilustração para ${recipe.title}`}>
       <div className="absolute -top-12 -right-10 size-44 rounded-full border-[22px] border-white/28" />
@@ -147,6 +170,7 @@ function formatMinutes(recipe: RecipeSummary) {
 
 export default function CookbookHome({ displayName, userId, initialRecipes }: { displayName: string; userId: string; initialRecipes: RecipeSummary[] }) {
   const router = useRouter();
+  const [recipes, setRecipes] = useState(initialRecipes);
   const [query, setQuery] = useState("");
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(
     () => new Set(),
@@ -154,7 +178,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   const [selectedTags, setSelectedTags] = useState<Set<string>>(
     () => new Set(),
   );
-  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [featuredRecipeId, setFeaturedRecipeId] = useState<string | null>(null);
   const [featuredChanging, setFeaturedChanging] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -162,16 +186,24 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   const [activeSection, setActiveSection] = useState<HomeSection>("topo");
   const navigationLockRef = useRef<{ section: HomeSection; until: number } | null>(null);
   const featuredTimersRef = useRef<number[]>([]);
+  const favouriteReactionTimerRef = useRef<number | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const requestedCoverPathsRef = useRef(new Set<string>());
+  const [visibleRecipeCount, setVisibleRecipeCount] = useState(RECIPES_PER_BATCH);
   const [favouriteIds, setFavouriteIds] = useState(() => new Set(initialRecipes.filter((recipe) => recipe.isFavourite).map((recipe) => recipe.id)));
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [favouriteReactionId, setFavouriteReactionId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel(`cookbook-home-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "recipes" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "recipe_favorites" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "recipe_favorites" }, async () => {
+        const { data } = await supabase.from("recipe_favorites").select("recipe_id").eq("user_id", userId);
+        if (data) setFavouriteIds(new Set(data.map((item) => item.recipe_id)));
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "recipe_tags" }, () => router.refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "tags" }, () => router.refresh())
       .subscribe();
@@ -183,7 +215,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
   const availableTags = useMemo(() => {
     const tags = new Map<string, { name: string; slug: string; color: string | null; count: number }>();
-    for (const recipe of initialRecipes) {
+    for (const recipe of recipes) {
       for (const tag of recipe.tags) {
         const current = tags.get(tag.slug);
         tags.set(tag.slug, {
@@ -197,11 +229,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     return [...tags.values()].sort((a, b) =>
       a.name.localeCompare(b.name, "pt-PT"),
     );
-  }, [initialRecipes]);
+  }, [recipes]);
 
   const filteredRecipes = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("pt-PT");
-    return initialRecipes.filter((recipe) => {
+    return recipes.filter((recipe) => {
       const searchable = `${recipe.title} ${recipe.description ?? ""} ${recipe.createdByName} ${recipe.ingredientNames.join(" ")} ${recipe.tags.map((tag) => tag.name).join(" ")}`.toLocaleLowerCase("pt-PT");
       const matchesSearch = !normalized || searchable.includes(normalized);
       const matchesQuickFilters =
@@ -216,15 +248,97 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       );
       return matchesSearch && matchesQuickFilters && matchesTags;
     });
-  }, [favouriteIds, initialRecipes, query, quickFilters, selectedTags]);
+  }, [favouriteIds, query, quickFilters, recipes, selectedTags]);
 
-  const featured = initialRecipes.length > 0 ? initialRecipes[featuredIndex % initialRecipes.length] : null;
+  const visibleRecipes = useMemo(
+    () => filteredRecipes.slice(0, visibleRecipeCount),
+    [filteredRecipes, visibleRecipeCount],
+  );
+  const hasMoreRecipes = visibleRecipes.length < filteredRecipes.length;
+
+  const featuredStorageKey = `cookbook:featured-recipe:${userId}`;
+  const storedFeaturedRecipeId = useSyncExternalStore(
+    subscribeToStorage,
+    () => {
+      try {
+        return window.localStorage.getItem(featuredStorageKey);
+      } catch {
+        return null;
+      }
+    },
+    () => null,
+  );
+  const featuredSelectionReady = useSyncExternalStore(noSubscription, () => true, () => false);
+  const selectedFeaturedId = featuredRecipeId ?? storedFeaturedRecipeId;
+  const storedFeaturedIndex = selectedFeaturedId
+    ? recipes.findIndex((recipe) => recipe.id === selectedFeaturedId)
+    : -1;
+  const featuredIndex = storedFeaturedIndex >= 0 ? storedFeaturedIndex : 0;
+  const featured = recipes.length > 0 ? recipes[featuredIndex] : null;
   const featuredPalette = useAdaptiveRecipeColour(
-    featured?.coverUrl,
-    featured?.id,
+    featuredSelectionReady ? featured?.coverUrl : null,
+    featuredSelectionReady ? featured?.id : undefined,
   );
   const featuredPanelColour = featuredPalette.colour;
   const profileInitial = displayName.trim().charAt(0).toLocaleUpperCase("pt-PT") || "U";
+
+  useEffect(() => {
+    if (!hasMoreRecipes || !loadMoreRef.current) return;
+
+    const marker = loadMoreRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setVisibleRecipeCount((current) =>
+          Math.min(current + RECIPES_PER_BATCH, filteredRecipes.length),
+        );
+      },
+      { rootMargin: "700px 0px" },
+    );
+
+    observer.observe(marker);
+    return () => observer.disconnect();
+  }, [filteredRecipes.length, hasMoreRecipes]);
+
+  useEffect(() => {
+    const candidates = featured ? [...visibleRecipes, featured] : visibleRecipes;
+    const paths = [...new Set(
+      candidates.flatMap((recipe) =>
+        recipe.coverPath && !recipe.coverUrl && !requestedCoverPathsRef.current.has(recipe.coverPath)
+          ? [recipe.coverPath]
+          : [],
+      ),
+    )];
+
+    if (paths.length === 0) return;
+    paths.forEach((path) => requestedCoverPathsRef.current.add(path));
+    let cancelled = false;
+
+    void createClient().storage
+      .from("recipe-images")
+      .createSignedUrls(paths, 60 * 60)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          paths.forEach((path) => requestedCoverPathsRef.current.delete(path));
+          return;
+        }
+
+        const urls = new Map<string, string>();
+        data?.forEach((image, index) => {
+          if (image.signedUrl) urls.set(paths[index], image.signedUrl);
+        });
+        if (urls.size === 0) return;
+        setRecipes((current) => current.map((recipe) => ({
+          ...recipe,
+          coverUrl: recipe.coverPath ? urls.get(recipe.coverPath) ?? recipe.coverUrl : recipe.coverUrl,
+        })));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [featured, visibleRecipes]);
 
   useEffect(() => {
     if (!profileOpen && !addOpen) return;
@@ -248,11 +362,9 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       }
       navigationLockRef.current = null;
       const marker = window.scrollY + Math.min(window.innerHeight * 0.28, 220);
-      const discoverTop = document.getElementById("descobrir")?.offsetTop ?? Number.POSITIVE_INFINITY;
       const recipesTop = document.getElementById("receitas")?.offsetTop ?? Number.POSITIVE_INFINITY;
 
       if (marker >= recipesTop) setActiveSection("receitas");
-      else if (marker >= discoverTop) setActiveSection("descobrir");
       else setActiveSection("topo");
     }
 
@@ -267,6 +379,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
   useEffect(() => () => {
     featuredTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    if (favouriteReactionTimerRef.current) window.clearTimeout(favouriteReactionTimerRef.current);
   }, []);
 
   function navigateToSection(section: HomeSection) {
@@ -274,25 +387,30 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
     setActiveSection(section);
   }
 
-  function changeFeatured(direction = 1) {
-    if (initialRecipes.length < 2 || featuredChanging) return;
+  function changeFeatured(direction?: number) {
+    if (recipes.length < 2 || featuredChanging) return;
     setFeaturedChanging(true);
     featuredTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     featuredTimersRef.current = [
       window.setTimeout(() => {
-        setFeaturedIndex((current) => (current + direction + initialRecipes.length) % initialRecipes.length);
+        const nextIndex = direction !== undefined
+          ? (featuredIndex + direction + recipes.length) % recipes.length
+          : (featuredIndex + Math.floor(Math.random() * (recipes.length - 1)) + 1) % recipes.length;
+        const nextRecipeId = recipes[nextIndex]?.id ?? null;
+        setFeaturedRecipeId(nextRecipeId);
+        if (nextRecipeId) {
+          try {
+            window.localStorage.setItem(featuredStorageKey, nextRecipeId);
+          } catch {
+            // A escolha continua a funcionar mesmo quando o browser bloqueia storage.
+          }
+        }
       }, 280),
       window.setTimeout(() => {
         setFeaturedChanging(false);
         featuredTimersRef.current = [];
       }, 850),
     ];
-  }
-
-  async function signOut() {
-    await createClient().auth.signOut();
-    router.push("/login");
-    router.refresh();
   }
 
   async function toggleFavourite(recipeId: string) {
@@ -314,10 +432,18 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
       return;
     }
 
-    router.refresh();
+    if (!wasFavourite) {
+      if (favouriteReactionTimerRef.current) window.clearTimeout(favouriteReactionTimerRef.current);
+      setFavouriteReactionId(recipeId);
+      favouriteReactionTimerRef.current = window.setTimeout(() => {
+        setFavouriteReactionId(null);
+      }, 1_650);
+      return;
+    }
   }
 
   function toggleQuickFilter(filter: QuickFilter) {
+    setVisibleRecipeCount(RECIPES_PER_BATCH);
     setQuickFilters((current) => {
       const next = new Set(current);
       if (next.has(filter)) next.delete(filter);
@@ -327,6 +453,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
   }
 
   function toggleTag(slug: string) {
+    setVisibleRecipeCount(RECIPES_PER_BATCH);
     setSelectedTags((current) => {
       const next = new Set(current);
       if (next.has(slug)) next.delete(slug);
@@ -347,13 +474,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
         </a>
         <nav aria-label="Navegação principal" className="space-y-1">
           <NavItem icon="home" label="Início" active={!profileOpen && activeSection === "topo"} href="#topo" onClick={() => navigateToSection("topo")} />
-          <NavItem icon="shuffle" label="Para hoje" active={!profileOpen && activeSection === "descobrir"} href="#descobrir" onClick={() => navigateToSection("descobrir")} />
           <NavItem icon="book" label="Receitas" active={!profileOpen && activeSection === "receitas"} href="#receitas" onClick={() => navigateToSection("receitas")} />
+          <NavButton icon="plus" label="Adicionar" active={addOpen} onClick={() => setAddOpen(true)} />
+          <NavItem icon="cook" label="Modo Cozinhar" href="/cozinhar" />
           <NavButton icon="more" label="Mais" active={profileOpen} onClick={() => setProfileOpen(true)} />
         </nav>
-        <button type="button" onClick={() => setAddOpen(true)} className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#285240] px-4 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5" aria-label="Adicionar ou importar receita">
-          <Icon name="plus" size={20} /><span className="hidden lg:inline">Adicionar receita</span>
-        </button>
         <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} className="mt-auto flex min-h-16 w-full items-center gap-3 border-t border-[#E5DED4] px-2 pt-5 text-left transition hover:text-[#285240]">
           <span className="grid size-10 shrink-0 place-items-center rounded-[55%_45%_62%_38%/45%_55%_45%_55%] bg-[#F36F56] font-serif text-lg font-black text-white">{profileInitial}</span>
           <div className="hidden min-w-0 lg:block"><p className="truncate text-sm font-extrabold">{displayName}</p><p className="text-xs text-[#7B746B]">Perfil ativo</p></div>
@@ -372,11 +497,11 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
           <label className="mt-7 flex min-h-14 items-center gap-3 border-b-2 border-[#CFC6B8] bg-transparent px-1 focus-within:border-[#285240]">
             <span className="text-[#746D64]"><Icon name="search" /></span>
             <span className="sr-only">Pesquisar receitas</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por receita ou ingrediente…" className="w-full bg-transparent py-3 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#948D83]" />
+            <input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleRecipeCount(RECIPES_PER_BATCH); }} placeholder="Pesquisar por receita ou ingrediente…" className="w-full bg-transparent py-3 text-base font-semibold outline-none placeholder:font-normal placeholder:text-[#948D83]" />
           </label>
 
           <div className="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Filtros rápidos">
-            <button type="button" onClick={() => { setQuickFilters(new Set()); setSelectedTags(new Set()); }} aria-pressed={!hasActiveFilters} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-extrabold transition ${!hasActiveFilters ? "bg-[#285240] text-white shadow-[0_3px_0_#193A2B]" : "border border-[#D8D0C4] bg-[#FFFCF6] text-[#716A62] hover:border-[#285240]"}`}>Todas</button>
+            <button type="button" onClick={() => { setQuickFilters(new Set()); setSelectedTags(new Set()); setVisibleRecipeCount(RECIPES_PER_BATCH); }} aria-pressed={!hasActiveFilters} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-extrabold transition ${!hasActiveFilters ? "bg-[#285240] text-white shadow-[0_3px_0_#193A2B]" : "border border-[#D8D0C4] bg-[#FFFCF6] text-[#716A62] hover:border-[#285240]"}`}>Todas</button>
             {([{ id: "favourites", label: "Favoritas" }, { id: "quick", label: "Até 30 min" }, { id: "easy", label: "Fáceis" }] as const).map((option) => <button key={option.id} type="button" onClick={() => toggleQuickFilter(option.id)} aria-pressed={quickFilters.has(option.id)} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-extrabold transition ${quickFilters.has(option.id) ? "bg-[#285240] text-white shadow-[0_3px_0_#193A2B]" : "border border-[#D8D0C4] bg-[#FFFCF6] text-[#716A62] hover:border-[#285240]"}`}>{option.label}</button>)}
           </div>
 
@@ -394,10 +519,10 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
           <section
             id="descobrir"
-            className="relative mt-9 touch-pan-y overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1] transition-colors duration-500"
-            style={{ backgroundColor: featuredPanelColour }}
+            className="relative mt-9 touch-pan-y overflow-hidden rounded-[2.2rem_2.2rem_4.8rem_2.2rem] text-white shadow-[0_16px_0_#E4DDD1]"
+            style={{ backgroundColor: featuredSelectionReady && featured && featuredPalette.isReady ? featuredPanelColour : "#E8E0D4" }}
             aria-labelledby="destaque-title"
-            aria-busy={featured ? !featuredPalette.isReady || featuredChanging : undefined}
+            aria-busy={featured ? !featuredSelectionReady || !featuredPalette.isReady || featuredChanging : undefined}
             onTouchStart={(event) => {
               const touch = event.touches[0];
               if (touch) swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
@@ -416,10 +541,10 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
             <div className={`pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[#FFF8E7]/94 text-[#285240] backdrop-blur-sm transition-all duration-300 ${featuredChanging ? "visible opacity-100" : "invisible opacity-0"}`} aria-hidden={!featuredChanging}>
               <div className="text-center"><CookbookMascotLoader label="A escolher outra receita…" className="size-28 sm:size-36" /><p className="mt-1 text-xs font-extrabold uppercase tracking-[.18em]">A escolher outra receita…</p></div>
             </div>
-            {featured && !featuredPalette.isReady ? (
+            {!featuredSelectionReady || (featured && !featuredPalette.isReady) ? (
               <FeaturedRecipeSkeleton />
             ) : featured ? (
-              <div className="grid grid-rows-[22rem_15rem] animate-[cookbook-reveal_.28s_ease-out] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
+              <div className="grid grid-rows-[22rem_15rem] sm:grid-rows-[24rem_20rem] lg:h-[25rem] lg:grid-cols-[1fr_1.05fr] lg:grid-rows-none">
                 <div className="relative flex min-h-0 flex-col justify-start overflow-hidden bg-cover bg-center p-7 transition-colors duration-500 sm:p-9 lg:p-11" style={featured.coverUrl ? { backgroundColor: featuredPanelColour, backgroundImage: `linear-gradient(${featuredPanelColour}E0, ${featuredPanelColour}E0), url("${featured.coverUrl.replaceAll('"', '\\"')}")` } : { backgroundColor: featuredPanelColour }}>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#F3C565]">Para cozinhar hoje</p>
@@ -433,7 +558,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:flex sm:max-w-sm">
                       <Link href={`/receitas/${featured.id}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-extrabold text-[#285240] sm:flex-1">Ver receita<Icon name="arrow" size={17} /></Link>
-                      <button type="button" onClick={() => changeFeatured(1)} disabled={featuredChanging || initialRecipes.length < 2} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F] sm:flex-1 disabled:opacity-60" title="Também podes deslizar a fotografia"><Icon name="shuffle" size={18} />Outra</button>
+                      <button type="button" onClick={() => changeFeatured()} disabled={featuredChanging || recipes.length < 2} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#F3C565] px-4 text-sm font-extrabold text-[#27231F] sm:flex-1 disabled:opacity-60" title="Também podes deslizar a fotografia"><Icon name="shuffle" size={18} />Outra</button>
                     </div>
                   </div>
                 </div>
@@ -467,12 +592,12 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Guardadas com carinho</p>
                 <h2 id="receitas-title" className="mt-1 font-serif text-3xl font-black tracking-[-.035em] sm:text-4xl">Todas as receitas</h2>
               </div>
-              <span className="font-serif text-lg font-bold text-[#7B746B]">{filteredRecipes.length}<span className="text-sm font-normal">/{initialRecipes.length}</span></span>
+              <span className="font-serif text-lg font-bold text-[#7B746B]" aria-label={`${visibleRecipes.length} de ${filteredRecipes.length} receitas visíveis`}>{visibleRecipes.length}<span className="text-sm font-normal">/{filteredRecipes.length}</span></span>
             </div>
 
             {filteredRecipes.length > 0 ? (
               <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredRecipes.map((recipe, index) => (
+                {visibleRecipes.map((recipe, index) => (
                   <article key={recipe.id} className="group overflow-hidden border-b-2 border-[#DDD5C9] bg-[#FFFCF6] transition hover:-translate-y-1 hover:border-[#F36F56]">
                     <Link href={`/receitas/${recipe.id}`} className={`${index % 3 === 1 ? "rounded-t-[5rem]" : index % 3 === 2 ? "rounded-tr-[4rem]" : "rounded-tl-[4rem]"} block overflow-hidden`}>
                       <RecipeArtwork recipe={recipe} index={index} />
@@ -484,7 +609,10 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                           <h3 className="mt-1 font-serif text-2xl font-black leading-tight tracking-[-.025em]"><Link href={`/receitas/${recipe.id}`} className="hover:text-[#285240]">{recipe.title}</Link></h3>
                           {recipe.tags.length ? <div className="mt-2 flex flex-wrap gap-1.5">{recipe.tags.slice(0, 3).map((tag) => <span key={tag.id} className="rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#453F39]" style={{ backgroundColor: `${tag.color ?? "#F3C565"}80` }}>#{tag.name}</span>)}</div> : null}
                         </div>
-                        <button type="button" onClick={() => void toggleFavourite(recipe.id)} aria-pressed={favouriteIds.has(recipe.id)} aria-label={favouriteIds.has(recipe.id) ? `Remover ${recipe.title} dos favoritos` : `Adicionar ${recipe.title} aos favoritos`} className={`grid size-11 shrink-0 place-items-center rounded-[52%_48%_38%_62%/55%_42%_58%_45%] transition ${favouriteIds.has(recipe.id) ? "bg-[#FBE0D8] text-[#E25B43]" : "bg-[#F0ECE5] text-[#777067] hover:text-[#E25B43]"}`}><Icon name="heart" size={19} /></button>
+                        <div className="relative shrink-0">
+                          <button type="button" onClick={() => void toggleFavourite(recipe.id)} aria-pressed={favouriteIds.has(recipe.id)} aria-label={favouriteIds.has(recipe.id) ? `Remover ${recipe.title} dos favoritos` : `Adicionar ${recipe.title} aos favoritos`} className={`grid size-11 place-items-center rounded-[52%_48%_38%_62%/55%_42%_58%_45%] transition ${favouriteIds.has(recipe.id) ? "bg-[#FBE0D8] text-[#E25B43] [&_svg]:fill-current" : "bg-[#F0ECE5] text-[#777067] hover:text-[#E25B43]"}`}><Icon name="heart" size={19} /></button>
+                          {favouriteReactionId === recipe.id ? <CookbookMascotFavouriteReaction className="absolute -right-1 top-12 z-20 w-24" /> : null}
+                        </div>
                       </div>
                       <div className="mt-4 flex items-center gap-3 text-sm font-bold text-[#736C64]">
                         <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={16} />{formatMinutes(recipe)}</span>
@@ -494,11 +622,22 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
                   </article>
                 ))}
               </div>
-            ) : initialRecipes.length > 0 ? (
+            ) : recipes.length > 0 ? (
               <div className="border-y-2 border-dashed border-[#CFC6B8] py-14 text-center"><p className="font-serif text-2xl font-black">Não encontrámos essa receita.</p><p className="mt-2 text-sm text-[#746D64]">Experimenta outra palavra ou ingrediente.</p></div>
             ) : (
               <div className="border-y-2 border-dashed border-[#CFC6B8] py-12 text-center"><p className="font-serif text-2xl font-black">Ainda não há receitas por aqui.</p><p className="mt-2 text-sm text-[#746D64]">O primeiro prato está à distância de alguns campos.</p></div>
             )}
+
+            {hasMoreRecipes ? (
+              <div ref={loadMoreRef} className="mt-8 flex min-h-24 items-center justify-center" role="status" aria-live="polite">
+                <button type="button" onClick={() => setVisibleRecipeCount((current) => Math.min(current + RECIPES_PER_BATCH, filteredRecipes.length))} className="inline-flex min-h-12 items-center gap-3 rounded-full border-2 border-[#D8CFC3] bg-[#FFFCF6] px-5 text-sm font-extrabold text-[#285240] shadow-[0_4px_0_#DED6CA] transition hover:-translate-y-0.5">
+                  <CookbookMascotLoader className="size-9" label="A trazer mais receitas" />
+                  Trazer mais receitas
+                </button>
+              </div>
+            ) : filteredRecipes.length > RECIPES_PER_BATCH ? (
+              <p className="mt-8 text-center text-sm font-bold text-[#7B746B]">Já estão todas as receitas à vista.</p>
+            ) : null}
           </section>
 
           <footer className="mt-14 border-t border-[#DDD5C9] py-7 text-sm text-[#746D64]">
@@ -509,9 +648,9 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
 
       <nav aria-label="Navegação principal" className="safe-bottom fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-[2rem] border border-[#DDD5C9] bg-[#FFFCF6]/96 px-2 py-2 shadow-[0_14px_40px_rgba(53,44,35,.16)] backdrop-blur md:hidden">
         <a href="#topo" onClick={() => navigateToSection("topo")} aria-current={!profileOpen && activeSection === "topo" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold ${!profileOpen && activeSection === "topo" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "topo" ? "rounded-[55%_45%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="home" size={18} /></span><span>Início</span></a>
-        <a href="#descobrir" onClick={() => navigateToSection("descobrir")} aria-current={!profileOpen && activeSection === "descobrir" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "descobrir" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "descobrir" ? "rounded-[52%_48%_60%_40%] bg-[#E5EBDD]" : ""}`}><Icon name="shuffle" size={18} /></span><span>Hoje</span></a>
-        <button type="button" onClick={() => setAddOpen(true)} aria-expanded={addOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold text-[#E25B43]" aria-label="Adicionar receita"><span className="grid size-9 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_3px_0_#D94F38]"><Icon name="plus" size={21} /></span><span>Adicionar</span></button>
         <a href="#receitas" onClick={() => navigateToSection("receitas")} aria-current={!profileOpen && activeSection === "receitas" ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${!profileOpen && activeSection === "receitas" ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${!profileOpen && activeSection === "receitas" ? "rounded-[48%_52%_38%_62%] bg-[#E5EBDD]" : ""}`}><Icon name="book" size={19} /></span><span>Receitas</span></a>
+        <button type="button" onClick={() => setAddOpen(true)} aria-expanded={addOpen} className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold text-[#E25B43]" aria-label="Adicionar receita"><span className="grid size-9 place-items-center rounded-[46%_54%_60%_40%/50%_42%_58%_50%] bg-[#F36F56] text-white shadow-[0_3px_0_#D94F38]"><Icon name="plus" size={21} /></span><span>Adicionar</span></button>
+        <Link href="/cozinhar" className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-[#746D64]" aria-label="Modo Cozinhar"><span className="grid size-8 place-items-center"><Icon name="cook" size={19} /></span><span>Cozinhar</span></Link>
         <button type="button" onClick={() => setProfileOpen(true)} aria-expanded={profileOpen} aria-current={profileOpen ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${profileOpen ? "text-[#285240]" : "text-[#746D64]"}`}><span className={`grid size-8 place-items-center ${profileOpen ? "rounded-[55%_45%_42%_58%] bg-[#E5EBDD]" : ""}`}><Icon name="more" size={19} /></span><span>Mais</span></button>
       </nav>
 
@@ -528,15 +667,28 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
               <button type="button" onClick={() => setProfileOpen(false)} className="grid size-10 place-items-center rounded-full bg-[#F1ECE4] text-xl" aria-label="Fechar menu">×</button>
             </div>
             <div className="mt-3 space-y-1">
+              <Link href="/explorar" onClick={() => setProfileOpen(false)} className="flex min-h-14 items-center gap-3 rounded-2xl px-3 font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
+                <span className="grid size-10 place-items-center rounded-[48%_52%_60%_40%] bg-[#FFF1D2]"><Icon name="shuffle" size={20} /></span>
+                <span className="flex-1">Descobrir receita</span>
+                <Icon name="arrow" size={17} />
+              </Link>
               <Link href="/caixote" onClick={() => setProfileOpen(false)} className="flex min-h-14 items-center gap-3 rounded-2xl px-3 font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
                 <span className="grid size-10 place-items-center rounded-[55%_45%_42%_58%] bg-[#E5EBDD]"><Icon name="trash" size={20} /></span>
                 <span className="flex-1">Abrir caixote</span>
                 <Icon name="arrow" size={17} />
               </Link>
-              <button type="button" onClick={() => void signOut()} className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 text-left font-extrabold text-[#A74735] transition hover:bg-[#FBE0D8]">
-                <span className="grid size-10 place-items-center rounded-[48%_52%_60%_40%] bg-[#FBE0D8]"><Icon name="logout" size={20} /></span>
-                Terminar sessão
-              </button>
+              <Link href="/definicoes" onClick={() => setProfileOpen(false)} className="flex min-h-14 items-center gap-3 rounded-2xl px-3 font-extrabold text-[#285240] transition hover:bg-[#E5EBDD]">
+                <span className="grid size-10 place-items-center rounded-[48%_52%_60%_40%] bg-[#FFF1D2]"><Icon name="shield" size={20} /></span>
+                <span className="flex-1">Segurança dos dados</span>
+                <Icon name="arrow" size={17} />
+              </Link>
+              <PwaInstallAction />
+              <form action="/auth/signout" method="post">
+                <button type="submit" className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 text-left font-extrabold text-[#A74735] transition hover:bg-[#FBE0D8]">
+                  <span className="grid size-10 place-items-center rounded-[48%_52%_60%_40%] bg-[#FBE0D8]"><Icon name="logout" size={20} /></span>
+                  Terminar sessão
+                </button>
+              </form>
             </div>
           </section>
         </div>

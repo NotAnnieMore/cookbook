@@ -2,7 +2,11 @@
 
 import { z } from "zod";
 
+import { extractRecipeWithGemini, reviewRecipeImportWithGemini, translateRecipeDraftWithGemini, type GeminiImportOutcome } from "@/lib/recipes/gemini-import";
+import type { ImportAiReviewResult } from "@/components/import-ai-review";
+import type { ImportCaptureFeedback } from "@/components/import-capture-feedback";
 import { sanitizeImportedRecipe } from "@/lib/recipes/import-sanitizer";
+import { recipeDraftLanguageText, shouldTranslateToPortuguese } from "@/lib/recipes/import-language";
 import {
   parseRecipeText,
   type TextImportDraft,
@@ -16,13 +20,17 @@ export type TextImportState = {
   draft?: TextImportDraft;
   warnings?: string[];
   importJobId?: string;
+  sourceText?: string;
+  aiReview?: ImportAiReviewResult;
+  captureFeedback?: ImportCaptureFeedback;
 };
 
 export async function analyseRecipeText(
-  _previousState: TextImportState,
+  previousState: TextImportState,
   formData: FormData,
 ): Promise<TextImportState> {
   const parsedInput = sourceSchema.safeParse(formData.get("source_text"));
+  const forceAiReview = formData.get("force_ai_review") === "1";
   if (!parsedInput.success) {
     return {
       message:
@@ -52,12 +60,41 @@ export async function analyseRecipeText(
     .eq("created_by", user.id)
     .gte("created_at", tenMinutesAgo);
   if (countError) {
-    return { message: "Não foi possível iniciar a importação. Tenta novamente." };
+    return forceAiReview
+      ? { ...previousState, message: "Não foi possível iniciar a revisão. Tenta novamente." }
+      : { message: "Não foi possível iniciar a importação. Tenta novamente." };
   }
   if ((count ?? 0) >= 10) {
+    const message = "Foram feitas várias tentativas seguidas. Aguarda alguns minutos antes de voltar a analisar.";
+    return forceAiReview ? { ...previousState, message } : { message };
+  }
+
+  if (forceAiReview && previousState.draft && previousState.importJobId) {
+    const { data: reviewJob, error: reviewJobError } = await supabase
+      .from("import_jobs")
+      .insert({
+        household_id: membership.household_id,
+        created_by: user.id,
+        input_type: "text",
+        input_text: parsedInput.data,
+        status: "ai",
+      })
+      .select("id")
+      .single();
+    if (reviewJobError || !reviewJob) return { ...previousState, message: "Não foi possível iniciar a revisão por IA." };
+
+    const reviewOutcome = await reviewRecipeImportWithGemini(parsedInput.data, previousState.draft);
+    await supabase.from("import_jobs").update({
+      status: reviewOutcome.review ? "preview" : "failed",
+      result_draft: previousState.draft,
+      error_code: reviewOutcome.errorCode,
+      error_message: reviewOutcome.errorCode,
+      completed_at: new Date().toISOString(),
+    }).eq("id", reviewJob.id);
     return {
-      message:
-        "Foram feitas várias tentativas seguidas. Aguarda alguns minutos antes de voltar a analisar.",
+      ...previousState,
+      message: undefined,
+      aiReview: reviewOutcome.review ?? { verdict: "unavailable", issues: [] },
     };
   }
 
@@ -76,21 +113,58 @@ export async function analyseRecipeText(
     return { message: "Não foi possível registar esta importação." };
   }
 
-  const result = parseRecipeText(parsedInput.data);
+  let result = parseRecipeText(parsedInput.data);
+  const needsPortugueseTranslation = result.draft
+    ? shouldTranslateToPortuguese(recipeDraftLanguageText(result.draft))
+    : shouldTranslateToPortuguese(parsedInput.data);
+  let usedGeminiFallback = false;
+  let translatedWithGemini = false;
+  let geminiErrorCode: GeminiImportOutcome["errorCode"] = null;
+
+  if (!result.draft || result.error) {
+    const geminiOutcome = await extractRecipeWithGemini(parsedInput.data, result.draft?.title ?? "", {
+      translateToPortuguese: needsPortugueseTranslation,
+    });
+    geminiErrorCode = geminiOutcome.errorCode;
+    if (geminiOutcome.result?.draft && !geminiOutcome.result.error) {
+      result = geminiOutcome.result;
+      usedGeminiFallback = true;
+      translatedWithGemini = needsPortugueseTranslation;
+    }
+  } else if (needsPortugueseTranslation) {
+    const translation = await translateRecipeDraftWithGemini(result.draft);
+    geminiErrorCode = translation.errorCode;
+    if (translation.draft) {
+      result = { ...result, draft: translation.draft };
+      translatedWithGemini = true;
+    }
+  }
+
   if (!result.draft || result.error) {
     await supabase
       .from("import_jobs")
       .update({
         status: "failed",
-        error_code: "TEXT_STRUCTURE_NOT_FOUND",
-        error_message: result.error,
+        error_code: geminiErrorCode ?? "TEXT_STRUCTURE_NOT_FOUND",
+        error_message: result.error ?? geminiErrorCode,
         completed_at: new Date().toISOString(),
       })
       .eq("id", job.id);
-    return { message: result.error ?? "Não foi possível interpretar o texto." };
+    const aiSuffix = geminiErrorCode && geminiErrorCode !== "NO_SOURCE_TEXT"
+      ? " A leitura assistida também não conseguiu criar uma estrutura segura."
+      : "";
+    return { message: `${result.error ?? "Não foi possível interpretar o texto."}${aiSuffix}` };
   }
 
   const sanitizedDraft = sanitizeImportedRecipe(result.draft);
+  const warnings = [...result.warnings];
+  if (translatedWithGemini) {
+    warnings.unshift("O Gemini organizou e traduziu esta receita para português de Portugal. Os números foram validados contra o texto original; confirma ainda assim o preview.");
+  } else if (usedGeminiFallback) {
+    warnings.unshift("O parser normal não foi suficiente e o Gemini organizou o texto. Confirma os ingredientes, quantidades e passos antes de guardar.");
+  } else if (needsPortugueseTranslation && geminiErrorCode) {
+    warnings.unshift("Detetámos texto noutra língua, mas a tradução assistida não ficou disponível. Mantivemos o conteúdo original para não perder a receita.");
+  }
 
   const { error: previewError } = await supabase
     .from("import_jobs")
@@ -107,7 +181,14 @@ export async function analyseRecipeText(
 
   return {
     draft: sanitizedDraft,
-    warnings: result.warnings,
+    warnings,
     importJobId: job.id,
+    sourceText: parsedInput.data,
+    captureFeedback: {
+      source: "text",
+      ai: usedGeminiFallback
+        ? translatedWithGemini ? "organised-translated" : "organised"
+        : translatedWithGemini ? "translated" : "none",
+    },
   };
 }

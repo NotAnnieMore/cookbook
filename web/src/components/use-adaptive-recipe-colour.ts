@@ -26,9 +26,11 @@ export function useAdaptiveRecipeColour(
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.decoding = "async";
-    image.onload = () => {
+    image.onload = async () => {
       if (cancelled) return;
       try {
+        await image.decode();
+        if (cancelled) return;
         const canvas = document.createElement("canvas");
         canvas.width = 32;
         canvas.height = 32;

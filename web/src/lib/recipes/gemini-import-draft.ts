@@ -55,7 +55,10 @@ export function geminiRecipeToImportResult(value: unknown, fallbackTitle = ""): 
   const parsedRecipe = geminiRecipeSchema.safeParse(value);
   if (!parsedRecipe.success) return null;
 
-  const parsed: TextImportResult = parseRecipeText(canonicalRecipeText(parsedRecipe.data, fallbackTitle));
+  const parsed: TextImportResult = parseRecipeText(
+    canonicalRecipeText(parsedRecipe.data, fallbackTitle),
+    { allowMissingPreparation: true },
+  );
   if (!parsed.draft || parsed.error) return null;
   parsed.draft.difficulty = parsedRecipe.data.difficulty;
   parsed.draft.tags = parsedRecipe.data.tags;

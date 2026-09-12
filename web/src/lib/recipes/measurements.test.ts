@@ -2,15 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  comparableQuantityRange,
   fahrenheitToCelsius,
   findCupReference,
   inchesToCentimetres,
   normalizeImportedIngredientMeasurement,
   normalizeImportedMeasurement,
   parseImportedQuantity,
+  parseQuantityValue,
 } from "./measurements.ts";
 
+test("keeps only original ranges whose endpoints can be compared directly", () => {
+  assert.deepEqual(comparableQuantityRange(0.8, 1.6), {
+    quantity: 0.8,
+    quantityMax: 1.6,
+  });
+  assert.deepEqual(comparableQuantityRange(800, 1.6), {
+    quantity: null,
+    quantityMax: null,
+  });
+});
+
 test("reads decimal commas, fractions and ranges", () => {
+  assert.equal(parseQuantityValue("1/2"), 0.5);
+  assert.equal(parseQuantityValue("1 1/2"), 1.5);
+  assert.equal(parseQuantityValue("¾"), 0.75);
   assert.deepEqual(parseImportedQuantity("1,5"), {
     quantity: 1.5,
     quantityMax: null,
@@ -125,4 +141,20 @@ test("automatically applies a safe cup reference to an imported ingredient", () 
   });
   assert.equal(measurement.confidence, "reference");
   assert.match(measurement.source, /kingarthurbaking\.com/);
+});
+
+test("converts Portuguese cream packets to their usual 200 ml size", () => {
+  const measurement = normalizeImportedIngredientMeasurement({
+    ingredientName: "natas",
+    quantity: 2,
+    unit: "pacotes",
+  });
+
+  assert.deepEqual(measurement.normalized, {
+    quantity: 400,
+    quantityMax: null,
+    unit: "ml",
+  });
+  assert.equal(measurement.confidence, "reference");
+  assert.match(measurement.note ?? "", /1 pacote de natas = 200 ml/);
 });

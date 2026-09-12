@@ -1,3 +1,4 @@
+import { canonicalIngredientUnit } from "./measurements.ts";
 import type { TextImportDraft } from "./text-import.ts";
 
 const emojiPattern = /(?:\p{Extended_Pictographic}|[\u{1F1E6}-\u{1F1FF}]|[\u{1F3FB}-\u{1F3FF}]|\uFE0F|\u200D|\u20E3)/gu;
@@ -23,6 +24,7 @@ export function sanitizeImportedRecipe(draft: TextImportDraft): TextImportDraft 
       ...ingredient,
       name: capitalizeFirstLetter(cleanImportedText(ingredient.name)),
       group: capitalizeFirstLetter(cleanImportedText(ingredient.group)),
+      unit: canonicalIngredientUnit(ingredient.unit),
     })),
     steps: draft.steps.map((step) => ({
       instruction: capitalizeFirstLetter(cleanImportedText(step.instruction)),

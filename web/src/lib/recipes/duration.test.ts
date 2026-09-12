@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { durationInputToMinutes, formatDurationInput, parseDurationInput } from "./duration.ts";
+import { durationInputToMinutes, formatDurationInput, formatTimerInput, parseDurationInput, timerInputToSeconds } from "./duration.ts";
 
 test("formats stored minutes as a natural duration", () => {
   assert.equal(formatDurationInput("185"), "3h 5min");
@@ -18,4 +18,11 @@ test("accepts hours, hours with minutes, clock notation and plain minutes", () =
   assert.equal(parseDurationInput("45"), 45);
   assert.equal(durationInputToMinutes("4h"), "240");
   assert.equal(durationInputToMinutes("quatro horas"), "invalid");
+});
+
+test("converts a natural timer duration to seconds and back", () => {
+  assert.equal(timerInputToSeconds("10min"), 600);
+  assert.equal(timerInputToSeconds("1h 30min"), 5400);
+  assert.equal(formatTimerInput(5400), "1h 30min");
+  assert.ok(Number.isNaN(timerInputToSeconds("0min")));
 });

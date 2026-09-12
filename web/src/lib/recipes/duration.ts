@@ -31,3 +31,14 @@ export function formatDurationInput(value: string | number | null | undefined) {
   const minutes = total % 60;
   return minutes ? `${hours}h ${minutes}min` : `${hours}h`;
 }
+
+export function timerInputToSeconds(value: string) {
+  const minutes = parseDurationInput(value);
+  if (minutes === null) return null;
+  return Number.isFinite(minutes) && minutes > 0 ? minutes * 60 : Number.NaN;
+}
+
+export function formatTimerInput(seconds: number | null | undefined) {
+  if (!seconds || seconds < 60 || seconds % 60 !== 0) return "";
+  return formatDurationInput(seconds / 60);
+}

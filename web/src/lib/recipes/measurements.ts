@@ -1,4 +1,4 @@
-export const MEASUREMENT_RULE_VERSION = "metric-v1";
+export const MEASUREMENT_RULE_VERSION = "metric-v2";
 
 export type SourceMeasurementSystem = "us" | "imperial" | "unknown";
 export type ConversionConfidence =
@@ -222,6 +222,10 @@ const unicodeFractions: Record<string, number> = {
 };
 
 const unitAliases: Record<string, string> = {
+  dente: "unid.",
+  dentes: "unid.",
+  clove: "unid.",
+  cloves: "unid.",
   oz: "oz",
   ounce: "oz",
   ounces: "oz",
@@ -246,6 +250,26 @@ const unitAliases: Record<string, string> = {
   fahrenheit: "°f",
   "°f": "°f",
   f: "°f",
+  cl: "cl",
+  centilitro: "cl",
+  centilitros: "cl",
+  dl: "dl",
+  decilitro: "dl",
+  decilitros: "dl",
+  pacote: "pacote",
+  pacotes: "pacote",
+  packet: "pacote",
+  packets: "pacote",
+  package: "pacote",
+  packages: "pacote",
+  pack: "pacote",
+  packs: "pacote",
+  embalagem: "pacote",
+  embalagens: "pacote",
+  saqueta: "pacote",
+  saquetas: "pacote",
+  sachet: "pacote",
+  sachets: "pacote",
 };
 
 function rounded(value: number, digits = 2) {
@@ -253,7 +277,7 @@ function rounded(value: number, digits = 2) {
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
-function parseSingleQuantity(raw: string) {
+export function parseQuantityValue(raw: string) {
   const value = raw.trim().replace(",", ".");
   if (!value) return null;
 
@@ -287,8 +311,8 @@ export function parseImportedQuantity(raw: string) {
 
   const range = value.match(/^(.+?)\s*(?:–|—|-|\bto\b|\ba\b)\s*(.+)$/i);
   if (range) {
-    const quantity = parseSingleQuantity(range[1]);
-    const quantityMax = parseSingleQuantity(range[2]);
+    const quantity = parseQuantityValue(range[1]);
+    const quantityMax = parseQuantityValue(range[2]);
     if (
       quantity === null ||
       quantityMax === null ||
@@ -299,8 +323,23 @@ export function parseImportedQuantity(raw: string) {
     return { quantity, quantityMax };
   }
 
-  const quantity = parseSingleQuantity(value);
+  const quantity = parseQuantityValue(value);
   return quantity === null ? null : { quantity, quantityMax: null };
+}
+
+export function comparableQuantityRange(
+  quantity: number | null,
+  quantityMax: number | null,
+) {
+  if (
+    quantity !== null &&
+    quantityMax !== null &&
+    quantityMax < quantity
+  ) {
+    return { quantity: null, quantityMax: null };
+  }
+
+  return { quantity, quantityMax };
 }
 
 function metricMagnitude(quantity: number, quantityMax: number | null, unit: "g" | "ml") {
@@ -316,7 +355,8 @@ function metricMagnitude(quantity: number, quantityMax: number | null, unit: "g"
   };
 }
 
-function normalizedUnit(unit: string) {
+export function canonicalIngredientUnit(unit: string | null | undefined) {
+  if (!unit) return "";
   const compact = unit.trim().toLocaleLowerCase("en-US").replace(/\s+/g, " ");
   return unitAliases[compact] ?? compact;
 }
@@ -335,7 +375,7 @@ export function normalizeImportedMeasurement({
   cupReference?: IngredientCupReference | null;
 }): NormalizedMeasurement {
   const original = { quantity, quantityMax, unit };
-  const canonicalUnit = normalizedUnit(unit);
+  const canonicalUnit = canonicalIngredientUnit(unit);
   const result = (
     normalized: NormalizedMeasurement["normalized"],
     confidence: ConversionConfidence,
@@ -383,6 +423,12 @@ export function normalizeImportedMeasurement({
   if (canonicalUnit === "tbsp") {
     return result(convert(15, "ml"), "reference", "culinary-metric-spoon");
   }
+  if (canonicalUnit === "cl") {
+    return result(convert(10, "ml"), "exact", "metric-centilitre");
+  }
+  if (canonicalUnit === "dl") {
+    return result(convert(100, "ml"), "exact", "metric-decilitre");
+  }
   if (canonicalUnit === "tsp") {
     return result(convert(5, "ml"), "reference", "culinary-metric-spoon");
   }
@@ -419,6 +465,29 @@ export function normalizeImportedIngredientMeasurement({
   unit: string;
   sourceSystem?: SourceMeasurementSystem;
 }) {
+  const canonicalUnit = canonicalIngredientUnit(measurement.unit);
+  const ingredient = searchableIngredient(ingredientName);
+  if (canonicalUnit === "pacote" && ingredient.includes(" natas ")) {
+    return {
+      original: {
+        quantity: measurement.quantity,
+        quantityMax: measurement.quantityMax ?? null,
+        unit: measurement.unit,
+      },
+      normalized: metricMagnitude(
+        measurement.quantity * 200,
+        measurement.quantityMax === null || measurement.quantityMax === undefined
+          ? null
+          : measurement.quantityMax * 200,
+        "ml",
+      ),
+      confidence: "reference" as const,
+      source: "cookbook-pt-package-reference",
+      ruleVersion: MEASUREMENT_RULE_VERSION,
+      note: "Conversão usada: 1 pacote de natas = 200 ml.",
+    };
+  }
+
   return normalizeImportedMeasurement({
     ...measurement,
     cupReference: findCupReference(ingredientName),

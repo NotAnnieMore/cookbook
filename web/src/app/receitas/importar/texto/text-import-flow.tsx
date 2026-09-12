@@ -5,6 +5,8 @@ import { useActionState } from "react";
 
 import RecipeForm from "@/app/receitas/nova/recipe-form";
 import { CookbookMascotIllustration } from "@/components/cookbook-mascot";
+import ImportAiReview from "@/components/import-ai-review";
+import ImportCaptureFeedback from "@/components/import-capture-feedback";
 
 import {
   analyseRecipeText,
@@ -29,7 +31,18 @@ export default function TextImportFlow({ displayName }: { displayName: string })
               </div>
               <Link href="/receitas/importar/texto" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border-2 border-[#285240] px-4 text-sm font-extrabold text-[#285240]">Colar outro texto</Link>
             </div>
+            <ImportCaptureFeedback feedback={state.captureFeedback} />
             {state.warnings?.length ? <div className="mt-5 rounded-2xl bg-[#FFF8E7] p-4"><p className="text-sm font-extrabold text-[#76591D]">Pontos a confirmar</p><ul className="mt-2 space-y-1 text-xs leading-5 text-[#74633E]">{state.warnings.slice(0, 8).map((warning) => <li key={warning}>• {warning}</li>)}</ul></div> : null}
+            {state.message ? <p role="alert" className="mt-4 rounded-2xl bg-[#FBE5DF] px-4 py-3 text-sm font-bold text-[#8B3F27]">{state.message}</p> : null}
+            <ImportAiReview review={state.aiReview} />
+            <form action={action} className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <input type="hidden" name="source_text" value={state.sourceText ?? ""} />
+              <input type="hidden" name="force_ai_review" value="1" />
+              <span className="text-xs leading-5 text-[#657066] sm:mr-auto">Opcional: compara a extração original com o texto que colaste.</span>
+              <button type="submit" disabled={pending} className="inline-flex min-h-11 items-center justify-center rounded-full border-2 border-[#285240] px-5 text-sm font-extrabold text-[#285240] transition hover:bg-white/55 disabled:cursor-wait disabled:opacity-55">
+                {pending ? "A rever…" : state.aiReview ? "Rever novamente com IA" : "Rever com IA"}
+              </button>
+            </form>
           </div>
         </section>
         <RecipeForm
@@ -51,10 +64,10 @@ export default function TextImportFlow({ displayName }: { displayName: string })
         <textarea id="source-text" name="source_text" required minLength={20} maxLength={30000} className="mt-5 min-h-80 w-full resize-y rounded-[1.5rem_1.5rem_3rem_1.5rem] border-2 border-[#D8D0C4] bg-[#F8F4EC] p-5 text-base leading-7 outline-none placeholder:text-[#999187] focus:border-[#285240] focus:ring-4 focus:ring-[#285240]/10" placeholder={`Cheesecake da Ana\n\nIngredientes\nBase:\n- 400 g de bolacha\n- 110 g de manteiga\n\nPreparação\n1. Triturar a bolacha...`} />
         <details className="mt-4 rounded-2xl bg-[#F8F4EC] px-4 py-3 text-sm text-[#6F6860]">
           <summary className="cursor-pointer font-extrabold text-[#285240]">Como obter um resultado melhor</summary>
-          <p className="mt-3 leading-6">Os títulos “Ingredientes” e “Preparação” ajudam, mas já não são obrigatórios quando a divisão é clara. Também separamos um parágrafo de preparação pelos pontos finais. Podes usar grupos como “Base:” e “Recheio:”.</p>
+          <p className="mt-3 leading-6">Os títulos “Ingredientes” e “Preparação” ajudam, mas já não são obrigatórios quando a divisão é clara. Também separamos um parágrafo de preparação pelos pontos finais. Podes usar grupos como “Base:” e “Recheio:”. Se o texto estiver noutra língua ou demasiado desorganizado, o Gemini ajuda a estruturar e traduzir para PT-PT sem poder inventar números.</p>
         </details>
         {state.message ? <p role="alert" className="mt-5 rounded-2xl bg-[#FBE5DF] px-5 py-4 text-sm font-bold text-[#8B3F27]">{state.message}</p> : null}
-        {pending ? <p role="status" className="mt-5 text-center text-sm font-extrabold text-[#285240] sm:text-right">A mascote está a separar ingredientes e passos…</p> : null}
+        {pending ? <p role="status" className="mt-5 text-center text-sm font-extrabold text-[#285240] sm:text-right">O Chef Pitéu está a organizar e, se necessário, a traduzir…</p> : null}
         <div className="mt-6 flex justify-end"><button type="submit" disabled={pending} className="min-h-14 rounded-full bg-[#F36F56] px-7 text-base font-extrabold text-white shadow-[0_6px_0_#D94F38] disabled:cursor-wait disabled:opacity-60">{pending ? "A analisar…" : "Criar preview"}</button></div>
       </form>
     </section>

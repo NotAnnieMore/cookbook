@@ -89,7 +89,7 @@ export default function RecipeContent({
   steps: Step[];
 }) {
   const numericBase = Number(baseServings);
-  const canScale = baseServings !== null && Number.isFinite(numericBase) && numericBase > 0;
+  const canScale = baseServings !== null && Number.isInteger(numericBase) && numericBase > 0;
   const [servings, setServings] = useState(canScale ? numericBase : 1);
   const factor = canScale ? servings / numericBase : 1;
 
@@ -103,15 +103,15 @@ export default function RecipeContent({
             <div className="rounded-[1.4rem_1.4rem_2rem_1.4rem] bg-[#E5EBDD] p-2" aria-label="Ajustar doses">
               <p className="px-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#617064]">Para quantos?</p>
               <div className="flex items-center gap-1">
-                <button type="button" onClick={() => setServings((current) => Math.max(0.5, current - 0.5))} className="grid size-10 place-items-center rounded-full bg-[#FFFCF6] text-xl font-black text-[#285240]" aria-label="Diminuir doses">−</button>
+                <button type="button" onClick={() => setServings((current) => Math.max(1, current - 1))} className="grid size-10 place-items-center rounded-full bg-[#FFFCF6] text-xl font-black text-[#285240]" aria-label="Diminuir doses">−</button>
                 <label className="sr-only" htmlFor="servings-scale">Número de {servingsLabel}</label>
-                <input id="servings-scale" type="number" min="0.5" step="0.5" value={servings} onChange={(event) => { const next = Number(event.target.value); if (Number.isFinite(next) && next > 0) setServings(next); }} className="h-10 w-14 bg-transparent text-center font-serif text-lg font-black outline-none" />
-                <button type="button" onClick={() => setServings((current) => current + 0.5)} className="grid size-10 place-items-center rounded-full bg-[#285240] text-xl font-black text-white" aria-label="Aumentar doses">+</button>
+                <input id="servings-scale" type="number" min="1" step="1" inputMode="numeric" value={servings} onChange={(event) => { const next = Number(event.target.value); if (Number.isInteger(next) && next > 0) setServings(next); }} className="h-10 w-14 bg-transparent text-center font-serif text-lg font-black outline-none" />
+                <button type="button" onClick={() => setServings((current) => current + 1)} className="grid size-10 place-items-center rounded-full bg-[#285240] text-xl font-black text-white" aria-label="Aumentar doses">+</button>
               </div>
             </div>
           ) : null}
         </div>
-        {canScale && servings !== numericBase ? <p role="status" className="mt-4 rounded-2xl bg-[#F3C565]/35 px-4 py-3 text-xs font-bold text-[#66501F]">Quantidades ajustadas de {new Intl.NumberFormat("pt-PT").format(numericBase)} para {new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 1 }).format(servings)} {servingsLabel}.</p> : null}
+        {canScale && servings !== numericBase ? <p role="status" className="mt-4 rounded-2xl bg-[#F3C565]/35 px-4 py-3 text-xs font-bold text-[#66501F]">Quantidades ajustadas de {new Intl.NumberFormat("pt-PT").format(numericBase)} para {new Intl.NumberFormat("pt-PT").format(servings)} {servingsLabel}.</p> : null}
         <ul className="mt-7 border-y-2 border-[#D9D1C5]">
           {ingredients.map((ingredient, index) => {
             const amount = scaledAmount(

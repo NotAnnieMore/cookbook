@@ -99,3 +99,111 @@ Preparação:
     ],
   );
 });
+
+test("counts garlic cloves as units instead of a special measurement", () => {
+  const result = parseRecipeText(`Frango com alho
+Ingredientes
+- 2 dentes de alho
+Preparação
+- Picar o alho e cozinhar.`);
+
+  assert.equal(result.error, null);
+  assert.deepEqual(
+    result.draft?.ingredients.map(({ quantity, unit, name }) => ({
+      quantity,
+      unit,
+      name,
+    })),
+    [{ quantity: "2", unit: "unid.", name: "alho" }],
+  );
+});
+
+test("keeps a title-less personal recipe editable and reads a trailing mixed metric range", () => {
+  const result = parseRecipeText(`INGREDIENTES:
+
+- Lombinho de porco 800g-1.6kg (normalmente faço 2 pedaços de lombinho, dá para 2 refeições com 4 pessoas)
+- Mostarda
+- Mel
+- Alhos ralados, pimentão doce e noz-moscada
+- Azeite
+- Sal
+
+============================================== PREPARO:
+
+- Numa tigela colocar, 3 colheres de sopa de mostarda; 2 colheres de sopa de mel; 3 dentes de alhos ralados; 1/2 colher de chá de pimentão doce; 1/2 colher de chá de noz-moscada; 150ml de azeite.
+- Numa travessa colocar os lombinhos e deitar a nossa mistura por cima. e deixar marinar (quanto mais tempo melhor!)
+- Levar ao forno a 180ºC durante 1 hora
+
+============================================== COISAS QUE EU FAÇO:
+
+- Quando falta uns 10-20mins eu abro o forno e corto o lombinho a meio
+- De vez em quando regar a carne com o próprio molho.`);
+
+  assert.equal(result.error, null);
+  assert.equal(result.draft?.title, "Receita importada");
+  assert.deepEqual(
+    {
+      quantity: result.draft?.ingredients[0].quantity,
+      quantityMax: result.draft?.ingredients[0].quantityMax,
+      unit: result.draft?.ingredients[0].unit,
+      name: result.draft?.ingredients[0].name,
+      originalQuantity: result.draft?.ingredients[0].originalQuantity,
+      originalQuantityMax: result.draft?.ingredients[0].originalQuantityMax,
+      originalUnit: result.draft?.ingredients[0].originalUnit,
+    },
+    {
+      quantity: "0,8",
+      quantityMax: "1,6",
+      unit: "kg",
+      name: "Lombinho de porco (normalmente faço 2 pedaços de lombinho, dá para 2 refeições com 4 pessoas)",
+      originalQuantity: "800",
+      originalQuantityMax: "1,6",
+      originalUnit: "g–kg",
+    },
+  );
+  assert.equal(result.draft?.steps.at(-1)?.section, "COISAS QUE EU FAÇO");
+  assert.match(result.warnings.join(" "), /título/i);
+});
+
+test("recognizes friendly headings, social bullets and more cooking verbs", () => {
+  const result = parseRecipeText(`Bolo de iogurte
+✨ O que vais precisar ✨
+→2 ovos
+✔ 2 dl de iogurte
+• 15 cl de óleo
+👩‍🍳 Como fazer 👩‍🍳
+Untar a forma.
+Incorporar os ingredientes e levar ao forno.`);
+
+  assert.equal(result.error, null);
+  assert.deepEqual(
+    result.draft?.ingredients.map(({ quantity, unit, name }) => ({ quantity, unit, name })),
+    [
+      { quantity: "2", unit: "unid.", name: "ovos" },
+      { quantity: "200", unit: "ml", name: "iogurte" },
+      { quantity: "150", unit: "ml", name: "óleo" },
+    ],
+  );
+  assert.deepEqual(result.draft?.steps.map((step) => step.instruction), [
+    "Untar a forma.",
+    "Incorporar os ingredientes e levar ao forno.",
+  ]);
+});
+
+test("recognizes common packet and discrete-item vocabulary", () => {
+  const result = parseRecipeText(`Sobremesa rápida
+Ingredientes
+- 2 embalagens de natas
+- 3 fatias de limão
+Preparação
+- Bater as natas e servir.`);
+
+  assert.equal(result.error, null);
+  assert.deepEqual(
+    result.draft?.ingredients.map(({ quantity, unit, name }) => ({ quantity, unit, name })),
+    [
+      { quantity: "400", unit: "ml", name: "natas" },
+      { quantity: "3", unit: "unid.", name: "limão" },
+    ],
+  );
+});
