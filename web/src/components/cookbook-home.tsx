@@ -599,7 +599,7 @@ export default function CookbookHome({ displayName, userId, initialRecipes }: { 
               <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-3">
                 {visibleRecipes.map((recipe, index) => (
                   <article key={recipe.id} className="group overflow-hidden border-b-2 border-[#DDD5C9] bg-[#FFFCF6] transition hover:-translate-y-1 hover:border-[#F36F56]">
-                    <Link href={`/receitas/${recipe.id}`} className={`${index % 3 === 1 ? "rounded-t-[5rem]" : index % 3 === 2 ? "rounded-tr-[4rem]" : "rounded-tl-[4rem]"} block overflow-hidden`}>
+                    <Link href={`/receitas/${recipe.id}`} className="block overflow-hidden bg-[#E8E0D4]">
                       <RecipeArtwork recipe={recipe} index={index} />
                     </Link>
                     <div className="px-1 py-5">
