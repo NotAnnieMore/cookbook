@@ -5,15 +5,16 @@ import { useActionState } from "react";
 import { login, type LoginState } from "./actions";
 
 const initialState: LoginState = {};
+const inputClass = "mt-2 min-h-13 w-full rounded-[1.15rem_1.15rem_1.8rem_1.15rem] border-2 border-[#D8D0C4] bg-[#F8F4EC] px-4 text-base font-semibold text-[#27231F] outline-none transition placeholder:font-normal placeholder:text-[#999187] focus:border-[#285240] focus:bg-[#FFFCF6] focus:ring-4 focus:ring-[#285240]/10";
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
-    <form action={formAction} className="mt-8 space-y-5">
+    <form action={formAction} className="mt-7 space-y-5">
       <div>
-        <label htmlFor="email" className="text-sm font-bold text-[#3F3A34]">
-          Email
+        <label htmlFor="email" className="text-xs font-extrabold uppercase tracking-[.13em] text-[#4F4942]">
+          Email da conta
         </label>
         <input
           id="email"
@@ -22,14 +23,13 @@ export function LoginForm() {
           inputMode="email"
           autoComplete="email"
           required
-          autoFocus
-          className="mt-2 min-h-13 w-full rounded-2xl border border-[#D8D0C5] bg-white px-4 text-base outline-none transition focus:border-[#365B3C] focus:ring-3 focus:ring-[#DDE5D6]"
-          placeholder="O teu email"
+          className={inputClass}
+          placeholder="nome@cookbook.com"
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="text-sm font-bold text-[#3F3A34]">
+        <label htmlFor="password" className="text-xs font-extrabold uppercase tracking-[.13em] text-[#4F4942]">
           Palavra-passe
         </label>
         <input
@@ -38,13 +38,13 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="mt-2 min-h-13 w-full rounded-2xl border border-[#D8D0C5] bg-white px-4 text-base outline-none transition focus:border-[#365B3C] focus:ring-3 focus:ring-[#DDE5D6]"
+          className={inputClass}
           placeholder="A tua palavra-passe"
         />
       </div>
 
       {state.message ? (
-        <p role="alert" className="rounded-2xl bg-[#FBE9E3] px-4 py-3 text-sm font-semibold text-[#8B3F27]">
+        <p role="alert" className="rounded-[1.15rem_1.15rem_2rem_1.15rem] border-l-4 border-[#F36F56] bg-[#FBE5DF] px-4 py-3 text-sm font-bold leading-5 text-[#8B3F27]">
           {state.message}
         </p>
       ) : null}
@@ -52,9 +52,10 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="flex min-h-13 w-full items-center justify-center rounded-2xl bg-[#365B3C] px-5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(54,91,60,.22)] transition hover:bg-[#2C4E32] disabled:cursor-wait disabled:opacity-65"
+        className="group flex min-h-14 w-full items-center justify-center gap-3 rounded-full bg-[#285240] px-6 text-sm font-extrabold text-white shadow-[0_6px_0_#193A2B] transition hover:-translate-y-0.5 hover:bg-[#315F4B] hover:shadow-[0_8px_0_#193A2B] active:translate-y-1 active:shadow-[0_2px_0_#193A2B] disabled:cursor-wait disabled:translate-y-0 disabled:opacity-65"
       >
-        {pending ? "A entrar…" : "Entrar"}
+        <span>{pending ? "O Chef Pitéu está a abrir…" : "Abrir o nosso livro"}</span>
+        <span aria-hidden className="text-lg transition-transform group-hover:translate-x-1">→</span>
       </button>
     </form>
   );
