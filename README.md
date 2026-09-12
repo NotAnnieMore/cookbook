@@ -20,15 +20,47 @@
 O Cookbook junta num só lugar as receitas de Ivo e Ana. Foi desenhado primeiro
 para telemóvel e tablet, com uma linguagem visual caseira, editorial e prática.
 
+<p align="center">
+  <a href="./docs/readme/recipe-desktop.webp">
+    <img src="./docs/readme/recipe-desktop.webp" alt="Página de uma receita no Cookbook em computador" />
+  </a><br />
+  <sub>Receita completa com fotografia, tempos, doses, etiquetas e autoria.</sub>
+</p>
+
+### Uma experiência pensada para telemóvel
+
 <table>
   <tr>
-    <td width="68%" align="center">
-      <img src="./docs/readme/recipe-desktop.webp" alt="Página de uma receita no Cookbook em computador" />
-      <br /><sub>Receita completa, fotografia, tempos, doses e autoria.</sub>
+    <td width="50%" align="center">
+      <a href="./docs/readme/home-mobile.webp">
+        <img src="./docs/readme/home-mobile.webp" width="360" alt="Página inicial do Cookbook em telemóvel" />
+      </a>
+      <br /><sub>Início e sugestão adaptada à fotografia.</sub>
     </td>
-    <td width="32%" align="center">
-      <img src="./docs/readme/home-mobile.webp" alt="Página inicial do Cookbook em telemóvel" />
-      <br /><sub>Sugestão diária adaptada à fotografia.</sub>
+    <td width="50%" align="center">
+      <a href="./docs/readme/cook-mode.webp">
+        <img src="./docs/readme/cook-mode.webp" width="382" alt="Modo Cozinhar do Cookbook em telemóvel" />
+      </a>
+      <br /><sub>Passos, ingredientes e temporizadores sempre à mão.</sub>
+    </td>
+  </tr>
+</table>
+
+### Importar, rever e só depois guardar
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="./docs/readme/import-text.webp">
+        <img src="./docs/readme/import-text.webp" alt="Janela de importação de texto do Cookbook" />
+      </a>
+      <br /><sub>Importação por texto com leitura assistida quando necessário.</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="./docs/readme/confirm-recipe.webp">
+        <img src="./docs/readme/confirm-recipe.webp" alt="Janela para confirmar uma receita importada" />
+      </a>
+      <br /><sub>Preview editável para confirmar todos os campos.</sub>
     </td>
   </tr>
 </table>
