@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import AppDecorations from "@/components/app-decorations";
@@ -86,12 +86,13 @@ function timerDurationLabel(seconds: number) {
 async function showTimerNotification(recipeId: string, recipeTitle: string, stepIndex: number, stepId: string) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
 
-  const options: NotificationOptions = {
+  const options: NotificationOptions & { vibrate?: number[] } = {
     body: `Passo ${stepIndex + 1} de ${recipeTitle}`,
     icon: "/icons/cookbook-192.png",
     badge: "/icons/cookbook-192.png",
     tag: `cookbook-timer-${recipeId}-${stepId}`,
     data: { url: `/receitas/${recipeId}/cozinhar` },
+    vibrate: [240, 120, 240, 120, 360],
   };
 
   try {
@@ -123,6 +124,7 @@ function initialTimers(steps: Step[], saved: Record<string, SavedCookTimer> = {}
 }
 
 export default function CookMode({ recipe }: { recipe: CookRecipe }) {
+  const router = useRouter();
   const storageKey = `cookbook:cook-mode:${recipe.id}`;
   const [hydrated, setHydrated] = useState(false);
   const [started, setStarted] = useState(false);
@@ -383,6 +385,10 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
     window.localStorage.removeItem(storageKey);
   }
 
+  function exitCookMode() {
+    router.replace(`/receitas/${recipe.id}`);
+  }
+
   function handleTouchEnd(event: React.TouchEvent<HTMLElement>) {
     const start = touchStartRef.current;
     touchStartRef.current = null;
@@ -401,7 +407,7 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
   if (!recipe.steps.length) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#F8F4EC] px-5 text-center text-[#27231F]">
-        <div><CookbookMascotIllustration variant="reading" className="mx-auto size-44" /><h1 className="mt-5 font-serif text-4xl font-black">Esta receita ainda não tem passos.</h1><Link href={`/receitas/${recipe.id}`} className="mt-7 inline-flex min-h-12 items-center rounded-full bg-[#285240] px-6 font-extrabold text-white">Voltar à receita</Link></div>
+        <div><CookbookMascotIllustration variant="reading" className="mx-auto size-44" /><h1 className="mt-5 font-serif text-4xl font-black">Esta receita ainda não tem passos.</h1><button type="button" onClick={exitCookMode} className="mt-7 inline-flex min-h-12 items-center rounded-full bg-[#285240] px-6 font-extrabold text-white">Voltar à receita</button></div>
       </main>
     );
   }
@@ -411,7 +417,7 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
       <main className="safe-top-page relative isolate min-h-screen overflow-x-clip bg-[#F8F4EC] px-5 py-6 text-[#27231F] sm:px-8">
         <AppDecorations tone="mixed" />
         <div className="relative z-10 mx-auto max-w-4xl">
-          <Link href={`/receitas/${recipe.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] hover:bg-[#E5EBDD]">← Voltar à receita</Link>
+          <button type="button" onClick={exitCookMode} className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[#285240] hover:bg-[#E5EBDD]">← Voltar à receita</button>
           <section className="mt-4 overflow-hidden rounded-[2rem_2rem_4.5rem_2rem] bg-[#FFFCF6] shadow-[0_12px_0_#E3DCD0] sm:grid sm:grid-cols-[.9fr_1.1fr]">
             <div className="grid place-items-center bg-[#E5EBDD] p-6"><CookbookMascotIllustration variant="cooking" className="size-48 sm:size-64" priority /></div>
             <div className="p-6 sm:p-9">
@@ -432,7 +438,7 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
   if (finished) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#F8F4EC] px-5 text-center text-[#27231F]">
-        <div className="max-w-xl"><CookbookMascotIllustration variant="presenting" className="mx-auto size-48" /><p className="mt-4 text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Receita concluída</p><h1 className="mt-2 font-serif text-5xl font-black tracking-[-.045em]">Está pronto para a mesa.</h1><p className="mt-4 leading-7 text-[#746D64]">Concluíste os {recipe.steps.length} passos de “{recipe.title}”.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href={`/receitas/${recipe.id}`} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#285240] px-6 font-extrabold text-white">Voltar à receita</Link><button type="button" onClick={restart} className="min-h-12 rounded-full border-2 border-[#285240] px-6 font-extrabold text-[#285240]">Cozinhar novamente</button></div></div>
+        <div className="max-w-xl"><CookbookMascotIllustration variant="presenting" className="mx-auto size-48" /><p className="mt-4 text-xs font-extrabold uppercase tracking-[.18em] text-[#E25B43]">Receita concluída</p><h1 className="mt-2 font-serif text-5xl font-black tracking-[-.045em]">Está pronto para a mesa.</h1><p className="mt-4 leading-7 text-[#746D64]">Concluíste os {recipe.steps.length} passos de “{recipe.title}”.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><button type="button" onClick={exitCookMode} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#285240] px-6 font-extrabold text-white">Voltar à receita</button><button type="button" onClick={restart} className="min-h-12 rounded-full border-2 border-[#285240] px-6 font-extrabold text-[#285240]">Cozinhar novamente</button></div></div>
       </main>
     );
   }
@@ -441,7 +447,7 @@ export default function CookMode({ recipe }: { recipe: CookRecipe }) {
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-[#F8F4EC] text-[#27231F]">
       <header className="safe-top shrink-0 border-b border-[#DDD5C9] bg-[#FFFCF6]/95 px-4 py-2 backdrop-blur sm:px-7 sm:py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <Link href={`/receitas/${recipe.id}`} className="grid size-11 shrink-0 place-items-center rounded-full text-xl font-black text-[#285240] hover:bg-[#E5EBDD]" aria-label="Sair do modo cozinhar">×</Link>
+          <button type="button" onClick={exitCookMode} className="grid size-11 shrink-0 place-items-center rounded-full text-xl font-black text-[#285240] hover:bg-[#E5EBDD]" aria-label="Sair do modo cozinhar">×</button>
           <div className="min-w-0 text-center"><p className="truncate font-serif text-lg font-black">{recipe.title}</p><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#746D64]">Passo {currentIndex + 1} de {recipe.steps.length}</p></div>
           <button type="button" onClick={() => setIngredientsOpen(true)} className="grid size-11 shrink-0 place-items-center rounded-full bg-[#E5EBDD] text-[#285240]" aria-label="Abrir ingredientes"><CookbookMascotMark className="size-8" /></button>
         </div>
