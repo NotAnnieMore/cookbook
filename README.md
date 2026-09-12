@@ -21,6 +21,13 @@ O Cookbook junta num só lugar as receitas de Ivo e Ana. Foi desenhado primeiro
 para telemóvel e tablet, com uma linguagem visual caseira, editorial e prática.
 
 <p align="center">
+  <a href="./docs/readme/login-desktop.png">
+    <img src="./docs/readme/login-desktop.png" alt="Página de entrada do Cookbook com o Chef Pitéu" />
+  </a><br />
+  <sub>Uma entrada privada e acolhedora para abrir o nosso livro de receitas.</sub>
+</p>
+
+<p align="center">
   <a href="./docs/readme/recipe-desktop.webp">
     <img src="./docs/readme/recipe-desktop.webp" alt="Página de uma receita no Cookbook em computador" />
   </a><br />
